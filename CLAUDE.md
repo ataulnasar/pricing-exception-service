@@ -40,7 +40,7 @@ Read both before you change any code.
 If a task would break one of these rules, **stop and ask**. Do not work around it.
 
 ## How to work
-1. Tests come first. The human writes the main tests for each rule.
+1. Tests come first. The test-writer agent writes them; the human approves them.
 2. **Never change, delete, skip or weaken a test to make it pass.** If you think a
    test is wrong, stop and explain why.
 3. **Do not add new dependencies** without asking first.
