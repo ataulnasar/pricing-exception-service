@@ -1,0 +1,73 @@
+# Business rules that must never break.
+# Each rule has an id, the rule, why it matters, and the tests that prove it.
+# Test names are planned names — update them when the tests exist.
+
+invariants:
+  - id: INV-01
+    rule: >
+      A submitted request is never changed. To use a different discount, the RM
+      supersedes the request: a new request is created and the old one becomes
+      SUPERSEDED. Only a PENDING request can be superseded. An approval stores
+      the discount the reviewer saw (approvedDiscountBps).
+    why: >
+      An approval must always apply to the exact request that was reviewed.
+      The audit trail must show what was really approved.
+    tests:
+      - PricingExceptionRequestTest.INV01_approval_records_reviewed_discount
+      - SupersedeIT.INV01_only_pending_request_can_be_superseded
+      - SupersedeIT.INV01_no_endpoint_changes_discount_after_approval
+
+  - id: INV-02
+    rule: >
+      Every status change writes exactly one history event (request_event),
+      in the same database transaction as the status change.
+    why: >
+      Users must see the full history of a request. History must never be
+      missing or out of sync with the current status.
+    tests:
+      - WorkflowIT.INV02_each_transition_writes_one_event
+      - ConcurrencyIT.INV02_losing_decision_writes_no_event
+
+  - id: INV-03
+    rule: >
+      The person who created a request can never approve or decline it.
+      A reviewer can only approve a discount up to their approval limit.
+    why: >
+      Four-eyes principle and approval authority are basic controls in banking.
+    tests:
+      - PricingExceptionRequestTest.INV03_requester_cannot_approve_own_request
+      - PricingExceptionRequestTest.INV03_requester_cannot_decline_own_request
+      - PricingExceptionRequestTest.INV03_reviewer_cannot_approve_above_limit
+
+  - id: INV-04
+    rule: >
+      An application has at most one active request (PENDING or APPROVED).
+      This is enforced by the database (unique index), not only in code.
+    why: >
+      Stops duplicate requests, also when a retry arrives without an
+      idempotency key, and stops two different discounts being approved.
+    tests:
+      - RequestRepositoryTest.INV04_second_active_request_is_rejected
+      - ConcurrencyIT.INV04_parallel_creates_without_key_create_one_request
+
+  - id: INV-05
+    rule: >
+      Only a PENDING request can change status. APPROVED, DECLINED, WITHDRAWN
+      and SUPERSEDED are final. A decision must send the current version
+      (If-Match); an old version is rejected.
+    why: >
+      A request is decided once. Two reviewers can never both decide it.
+    tests:
+      - PricingExceptionRequestTest.INV05_transition_table
+      - ConcurrencyIT.INV05_two_parallel_decisions_only_one_wins
+      - DecisionApiTest.INV05_missing_if_match_returns_428
+
+  - id: INV-06
+    rule: >
+      A request can only be created or approved when the mortgage application
+      is OPEN.
+    why: >
+      A discount on a closed application has no meaning and must not be used.
+    tests:
+      - WorkflowIT.INV06_cannot_create_for_closed_application
+      - WorkflowIT.INV06_cannot_approve_for_closed_application
