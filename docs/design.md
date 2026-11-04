@@ -100,15 +100,24 @@ plain-text `detail` and the extra property `code`:
 | 409 | `APPLICATION_NOT_OPEN` | Application is not OPEN on create or approve (INV-06) |
 | 409 | `CONCURRENT_MODIFICATION` | Optimistic lock lost inside the transaction |
 | 409 | `DATA_CONFLICT` | Any other database constraint violation (details only in the server log) |
+| 409 | `IDEMPOTENCY_IN_PROGRESS` | The first request with this `Idempotency-Key` is still running |
 | 412 | `VERSION_MISMATCH` | `If-Match` is not the current version (INV-05) |
 | 422 | `VALIDATION_FAILED` | Bean Validation on the body; `errors[]` lists `{field, message}` |
 | 422 | `INVALID_DISCOUNT`, `INVALID_REASON`, `INVALID_COMMENT` | Domain `ValidationException` |
+| 422 | `IDEMPOTENCY_KEY_REUSED` | Same caller and `Idempotency-Key`, different body |
 | 428 | `IF_MATCH_REQUIRED` | Decision, withdrawal or supersede without `If-Match` |
 | 500 | `INTERNAL_ERROR` | Unexpected error; no details are exposed |
 | any | `HTTP_<status>` | Spring's own errors: unknown route (404), wrong method (405, with `Allow`), unsupported media type (415) |
 
 The `ETag` of a request is its version in double quotes, e.g. `"0"`. `If-Match` must carry exactly
 that value; `*`, weak tags, lists, unquoted or zero-padded numbers are 400.
+
+**Idempotency-Key** (optional on create and supersede, 1 to 128 characters, scoped per caller): the first
+response (status, `Location`, `ETag`, body) is stored in the same transaction as the request and replayed
+for the same key and the same body, with `Idempotent-Replayed: true`. "Same body" means the same
+SHA-256 of the canonical form of the parsed body (operation name, then each field length-prefixed:
+`create\n7:MA-1003\n2:40\n<len>:<reason>`), so whitespace, field order and unknown fields do not matter
+and the hash does not depend on any JSON library. A failed create stores nothing. Records are purged after `pricing.idempotency.ttl` (default 24h).
 
 **Check order of an HTTP request:** identity (401) → request shape: body validation (400/422), then
 `If-Match` presence and form (428/400) → the use case: existence (404), version (412), then the domain

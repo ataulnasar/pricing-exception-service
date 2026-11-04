@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,10 +23,12 @@ import org.springframework.test.web.servlet.MvcResult;
 /**
  * End-to-end workflow against real H2 + seed data, no mocks.
  *
- * <p>Order independence: MA-1003 has exactly one free active slot, so only the happy-path test
- * creates a request there (it also does the 409-after-approve check inside the same test).
- * All other tests use seed rows read-only (MA-1002 PENDING request, MA-1004 CLOSED) and
- * never change their state, so they can run in any order.
+ * <p>Independence: every test that writes (creates a request or changes a status) creates its OWN
+ * OPEN application with a unique id (owner rm-anna, inserted with JDBC) and never relies on a seed
+ * application's active slot. Seed rows are used read-only or in calls that fail before any write:
+ * MA-1002 / request ...0002 (PENDING, 80 bps: 409 on create, 412 stale If-Match, 428, 403 over limit),
+ * MA-1001 / request ...0001 (APPROVED: 409 on re-approve), MA-1004 (CLOSED: 409 on create),
+ * MA-1003 (only as the target of a create that is rejected with 403). Tests can run in any order.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -37,6 +40,14 @@ class WorkflowIT {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
 
+    /** Inserts a fresh OPEN application owned by rm-anna with a unique id. Leftovers are harmless. */
+    private String newApp() {
+        String id = "MA-T" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        jdbc.update("INSERT INTO mortgage_application (id, customer_ref, standard_rate_bps, status, owner_rm_id)"
+                + " VALUES (?, ?, 450, 'OPEN', 'rm-anna')", id, "CUST-" + id);
+        return id;
+    }
+
     private static String createBody(String applicationId, int discount) {
         return "{\"applicationId\":\"" + applicationId + "\",\"discountBps\":" + discount
                 + ",\"reason\":\"Customer has other offers\"}";
@@ -44,9 +55,10 @@ class WorkflowIT {
 
     @Test
     void INV02_each_transition_writes_one_event() throws Exception {
+        String app = newApp();
         // create
         MvcResult created = mvc.perform(post(BASE).header("X-User-Id", "rm-erik")
-                        .contentType(MediaType.APPLICATION_JSON).content(createBody("MA-1003", 40)))
+                        .contentType(MediaType.APPLICATION_JSON).content(createBody(app, 40)))
                 .andExpect(status().isCreated())
                 .andExpect(header().exists("Location"))
                 .andExpect(header().string("ETag", "\"0\""))
@@ -60,7 +72,7 @@ class WorkflowIT {
                 .andExpect(header().string("ETag", "\"0\""))
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.requestedBy").value("rm-erik"))
-                .andExpect(jsonPath("$.applicationId").value("MA-1003"))
+                .andExpect(jsonPath("$.applicationId").value(app))
                 .andExpect(jsonPath("$.discountBps").value(40))
                 .andExpect(jsonPath("$.decidedBy").doesNotExist())
                 .andExpect(jsonPath("$.events.length()").value(1))
@@ -109,9 +121,9 @@ class WorkflowIT {
         mvc.perform(get(location).header("X-User-Id", "rm-erik"))
                 .andExpect(jsonPath("$.events.length()").value(2));
 
-        // INV-04: the approved request still occupies MA-1003
+        // INV-04: the approved request still occupies its application
         mvc.perform(post(BASE).header("X-User-Id", "rm-anna")
-                        .contentType(MediaType.APPLICATION_JSON).content(createBody("MA-1003", 30)))
+                        .contentType(MediaType.APPLICATION_JSON).content(createBody(app, 30)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ACTIVE_REQUEST_EXISTS"));
     }
@@ -224,20 +236,21 @@ class WorkflowIT {
 
     @Test
     void INV06_cannot_approve_for_closed_application() throws Exception {
-        String url = BASE + "/" + SEED_PENDING_ID;
-        jdbc.update("UPDATE mortgage_application SET status = 'CLOSED' WHERE id = 'MA-1002'");
-        try {
-            mvc.perform(post(url + "/decision").header("X-User-Id", "rev-johan").header("If-Match", "\"0\"")
-                            .contentType(MediaType.APPLICATION_JSON).content("{\"outcome\":\"APPROVED\"}"))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.code").value("APPLICATION_NOT_OPEN"));
-            mvc.perform(get(url).header("X-User-Id", "rm-anna"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("PENDING"))
-                    .andExpect(jsonPath("$.version").value(0))
-                    .andExpect(jsonPath("$.events.length()").value(1));
-        } finally {
-            jdbc.update("UPDATE mortgage_application SET status = 'OPEN' WHERE id = 'MA-1002'");
-        }
+        // Own application and own request (the previous version closed seed application MA-1002 for a moment).
+        String app = newApp();
+        MvcResult created = mvc.perform(post(BASE).header("X-User-Id", "rm-anna")
+                        .contentType(MediaType.APPLICATION_JSON).content(createBody(app, 40)))
+                .andExpect(status().isCreated()).andReturn();
+        String url = created.getResponse().getHeader("Location");
+        jdbc.update("UPDATE mortgage_application SET status = 'CLOSED' WHERE id = ?", app);
+        mvc.perform(post(url + "/decision").header("X-User-Id", "rev-johan").header("If-Match", "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"outcome\":\"APPROVED\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("APPLICATION_NOT_OPEN"));
+        mvc.perform(get(url).header("X-User-Id", "rm-anna"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.version").value(0))
+                .andExpect(jsonPath("$.events.length()").value(1));
     }
 }

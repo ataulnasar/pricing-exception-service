@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import se.ataulnasar.pricingexception.application.ConflictException;
+import se.ataulnasar.pricingexception.application.IdempotencyInProgressException;
+import se.ataulnasar.pricingexception.application.IdempotencyKeyReusedException;
 import se.ataulnasar.pricingexception.application.NotFoundException;
 import se.ataulnasar.pricingexception.application.VersionMismatchException;
 import se.ataulnasar.pricingexception.domain.DomainException;
@@ -59,7 +61,7 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.NOT_FOUND, e);
     }
 
-    @ExceptionHandler({ConflictException.class, InvalidTransitionException.class})
+    @ExceptionHandler({ConflictException.class, InvalidTransitionException.class, IdempotencyInProgressException.class})
     ProblemDetail conflict(DomainException e) {
         return problem(HttpStatus.CONFLICT, e);
     }
@@ -74,8 +76,8 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.PRECONDITION_REQUIRED, e);
     }
 
-    @ExceptionHandler(ValidationException.class)
-    ProblemDetail domainValidation(ValidationException e) {
+    @ExceptionHandler({ValidationException.class, IdempotencyKeyReusedException.class})
+    ProblemDetail domainValidation(DomainException e) {
         return problem(HttpStatus.UNPROCESSABLE_CONTENT, e);
     }
 

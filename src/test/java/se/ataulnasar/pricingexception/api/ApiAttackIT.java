@@ -11,6 +11,7 @@ import com.jayway.jsonpath.JsonPath;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -30,10 +31,10 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 /**
  * Attack tests against the real stack (H2 + seed data, no mocks).
  *
- * <p>This class uses its OWN in-memory database (different datasource URL, so a separate Spring
- * context) so that WorkflowIT consuming MA-1003's active slot cannot influence it. Inside this class
- * every test that creates a request on MA-1003 frees the slot again (decline or withdraw) before it ends.
- * Seed request ...0002 (PENDING, 80 bps) is never written to.
+ * <p>Independence: every test that writes creates its OWN OPEN application (unique id, owner rm-anna,
+ * inserted with JDBC) and never touches a seed application's active slot. Seed request ...0002
+ * (PENDING, 80 bps) and ...0001 (APPROVED) are used read-only or only in calls that fail before
+ * any write (stale/malformed If-Match, 403 over limit). The class keeps its own datasource URL.
  */
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:attack;DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc
@@ -67,9 +68,17 @@ class ApiAttackIT {
                 .contentType(MediaType.APPLICATION_JSON).content(content));
     }
 
-    /** Creates on MA-1003 as rm-erik and returns the Location path. Caller must free the slot. */
-    private String createOnMa1003(int discount, String reason) throws Exception {
-        MvcResult r = createRaw("rm-erik", body("MA-1003", discount, json(reason))).andExpect(status().isCreated()).andReturn();
+    /** Inserts a fresh OPEN application owned by rm-anna with a unique id. Leftovers are harmless. */
+    private String newApp() {
+        String id = "MA-T" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        jdbc.update("INSERT INTO mortgage_application (id, customer_ref, standard_rate_bps, status, owner_rm_id)"
+                + " VALUES (?, ?, 450, 'OPEN', 'rm-anna')", id, "CUST-" + id);
+        return id;
+    }
+
+    /** Creates on the given own application as rm-erik and returns the Location path. */
+    private String createOn(String app, int discount, String reason) throws Exception {
+        MvcResult r = createRaw("rm-erik", body(app, discount, json(reason))).andExpect(status().isCreated()).andReturn();
         return r.getResponse().getHeader("Location");
     }
 
@@ -164,35 +173,40 @@ class ApiAttackIT {
 
     @Test
     void api_create_discount_as_json_string_is_not_silently_coerced_JUDGEMENT() throws Exception {
+        String app = newApp();
         // Contract: "whole number". A string "101" must not be coerced into a number and validated as one.
-        createRaw("rm-erik", body("MA-1003", "\"101\"", json("r"))).andExpect(status().isBadRequest());
+        createRaw("rm-erik", body(app, "\"101\"", json("r"))).andExpect(status().isBadRequest());
     }
 
     @Test
     void api_create_discount_in_exponent_notation_is_400() throws Exception {
-        createRaw("rm-erik", body("MA-1003", "1e2", json("r"))).andExpect(status().isBadRequest());
+        String app = newApp();
+        createRaw("rm-erik", body(app, "1e2", json("r"))).andExpect(status().isBadRequest());
     }
 
     @Test
     void api_create_discount_larger_than_int_is_400_not_500() throws Exception {
-        createRaw("rm-erik", body("MA-1003", "2147483648", json("r"))).andExpect(status().isBadRequest());
-        createRaw("rm-erik", body("MA-1003", "99999999999999999999", json("r"))).andExpect(status().isBadRequest());
+        String app = newApp();
+        createRaw("rm-erik", body(app, "2147483648", json("r"))).andExpect(status().isBadRequest());
+        createRaw("rm-erik", body(app, "99999999999999999999", json("r"))).andExpect(status().isBadRequest());
     }
 
     @Test
     void INV01_discount_0_101_and_negative_are_422_INVALID_DISCOUNT_and_nothing_is_stored() throws Exception {
+        String app = newApp();
         for (int bad : new int[] {0, 101, -1, Integer.MIN_VALUE}) {
-            createRaw("rm-erik", body("MA-1003", bad, json("r"))).andExpect(status().isUnprocessableEntity())
+            createRaw("rm-erik", body(app, bad, json("r"))).andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.code").value("INVALID_DISCOUNT"));
         }
-        mvc.perform(get(BASE).param("applicationId", "MA-1003").header("X-User-Id", "rm-erik"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1)); // only the seed DECLINED one
+        mvc.perform(get(BASE).param("applicationId", app).header("X-User-Id", "rm-erik"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0)); // own application: nothing stored
     }
 
     @Test
     void INV01_discount_1_and_100_are_accepted_by_the_real_service() throws Exception {
+        String app = newApp();
         for (int ok : new int[] {1, 100}) {
-            String loc = createOnMa1003(ok, "boundary " + ok);
+            String loc = createOn(app, ok, "boundary " + ok);
             mvc.perform(get(loc).header("X-User-Id", "rm-erik")).andExpect(jsonPath("$.discountBps").value(ok));
             withdraw(loc, 0);
         }
@@ -200,7 +214,8 @@ class ApiAttackIT {
 
     @Test
     void api_create_ignores_unknown_fields_and_client_supplied_status_and_requestedBy() throws Exception {
-        String content = "{\"applicationId\":\"MA-1003\",\"discountBps\":10,\"reason\":\"x\",\"status\":\"APPROVED\","
+        String app = newApp();
+        String content = "{\"applicationId\":\"" + app + "\",\"discountBps\":10,\"reason\":\"x\",\"status\":\"APPROVED\","
                 + "\"requestedBy\":\"rm-anna\",\"version\":7,\"decidedBy\":\"rev-sara\",\"id\":\"00000000-0000-0000-0000-000000000099\"}";
         MvcResult r = createRaw("rm-erik", content).andExpect(status().isCreated()).andReturn();
         String json = r.getResponse().getContentAsString();
@@ -229,16 +244,18 @@ class ApiAttackIT {
 
     @Test
     void api_create_reason_of_only_nbsp_or_zero_width_space_is_422_INVALID_REASON() throws Exception {
-        createRaw("rm-erik", body("MA-1003", 10, json("  "))).andExpect(status().isUnprocessableEntity())
+        String app = newApp();
+        createRaw("rm-erik", body(app, 10, json("  "))).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("INVALID_REASON"));
-        createRaw("rm-erik", body("MA-1003", 10, json("​"))).andExpect(status().isUnprocessableEntity());
+        createRaw("rm-erik", body(app, 10, json("​"))).andExpect(status().isUnprocessableEntity());
     }
 
     @Test
     void api_reason_round_trips_unchanged_with_whitespace_and_500_multibyte_chars() throws Exception {
+        String app = newApp();
         String reason = "  漢".repeat(1) + "é".repeat(495) + " \t";
         assertThat(reason.length()).isEqualTo(500);
-        String loc = createOnMa1003(10, reason);
+        String loc = createOn(app, 10, reason);
         String stored = mvc.perform(get(loc).header("X-User-Id", "rm-erik")).andReturn().getResponse().getContentAsString();
         assertThat(JsonPath.<String>read(stored, "$.reason")).isEqualTo(reason);
         withdraw(loc, 0);
@@ -248,7 +265,8 @@ class ApiAttackIT {
 
     @Test
     void api_reason_with_nul_character_never_causes_500() throws Exception {
-        MvcResult r = createRaw("rm-erik", body("MA-1003", 10, json("a\u0000b"))).andReturn();
+        String app = newApp();
+        MvcResult r = createRaw("rm-erik", body(app, 10, json("a\u0000b"))).andReturn();
         assertThat(r.getResponse().getStatus()).isLessThan(500);
         if (r.getResponse().getStatus() == 201) withdraw(r.getResponse().getHeader("Location"), 0);
     }
@@ -261,14 +279,15 @@ class ApiAttackIT {
 
     @Test
     void api_decision_comment_null_empty_500_accepted_501_rejected_without_changing_state() throws Exception {
+        String app = newApp();
         for (String comment : new String[] {"null", "\"\"", json("c".repeat(500))}) {
-            String loc = createOnMa1003(10, "r");
+            String loc = createOn(app, 10, "r");
             MvcResult r = decision(loc, "rev-sara", "\"0\"", "{\"outcome\":\"DECLINED\",\"comment\":" + comment + "}")
                     .andExpect(status().isOk()).andReturn();
             String again = mvc.perform(get(loc).header("X-User-Id", "rev-sara")).andReturn().getResponse().getContentAsString();
             assertThat(JsonPath.<Object>read(again, "$.decisionComment")).isEqualTo(JsonPath.<Object>read(r.getResponse().getContentAsString(), "$.decisionComment"));
         }
-        String loc = createOnMa1003(10, "r");
+        String loc = createOn(app, 10, "r");
         decision(loc, "rev-sara", "\"0\"", "{\"outcome\":\"DECLINED\",\"comment\":" + json("c".repeat(501)) + "}")
                 .andExpect(status().isUnprocessableEntity());
         mvc.perform(get(loc).header("X-User-Id", "rev-sara")).andExpect(jsonPath("$.status").value("PENDING")).andExpect(jsonPath("$.version").value(0));
@@ -304,7 +323,8 @@ class ApiAttackIT {
 
     @Test
     void api_list_is_newest_first() throws Exception {
-        String loc = createOnMa1003(10, "newest");
+        String app = newApp();
+        String loc = createOn(app, 10, "newest");
         String list = mvc.perform(get(BASE).header("X-User-Id", "rm-anna")).andReturn().getResponse().getContentAsString();
         List<String> created = JsonPath.read(list, "$[*].createdAt");
         List<Instant> times = new ArrayList<>();
@@ -380,11 +400,12 @@ class ApiAttackIT {
 
     @Test
     void api_validation_detail_does_not_echo_user_text() throws Exception {
+        String app = newApp();
         String evil = "<img src=x onerror=alert(1)>";
         MvcResult r = decision(SEED_PENDING, "rev-sara", "\"0\"", "{\"outcome\":\"DECLINED\",\"comment\":" + json(evil + "c".repeat(500)) + "}")
                 .andExpect(status().isUnprocessableEntity()).andReturn();
         assertThat(r.getResponse().getContentAsString()).doesNotContain("onerror");
-        MvcResult r2 = createRaw("rm-erik", "{\"applicationId\":\"MA-1003\",\"discountBps\":1,\"reason\":" + json(evil.repeat(30)) + "}")
+        MvcResult r2 = createRaw("rm-erik", "{\"applicationId\":\"" + app + "\",\"discountBps\":1,\"reason\":" + json(evil.repeat(30)) + "}")
                 .andExpect(status().isUnprocessableEntity()).andReturn();
         assertThat(r2.getResponse().getContentAsString()).doesNotContain("onerror");
     }
@@ -393,7 +414,8 @@ class ApiAttackIT {
 
     @Test
     void api_mortgage_process_cannot_create_withdraw_or_decide() throws Exception {
-        createRaw("mortgage-system", body("MA-1003", 10, json("r"))).andExpect(status().isForbidden())
+        String app = newApp();
+        createRaw("mortgage-system", body(app, 10, json("r"))).andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("WRONG_ROLE"));
         decision(SEED_PENDING, "mortgage-system", "\"0\"", "{\"outcome\":\"DECLINED\"}").andExpect(status().isForbidden());
         mvc.perform(post(SEED_PENDING + "/withdrawal").header("X-User-Id", "mortgage-system").header("If-Match", "\"0\""))
@@ -402,14 +424,15 @@ class ApiAttackIT {
 
     @Test
     void INV06_decline_still_works_on_closed_application() throws Exception {
+        String app = newApp();
         // INV-06: the application must be OPEN to create or approve only; decline is allowed.
-        String loc = createOnMa1003(10, "r");
-        jdbc.update("UPDATE mortgage_application SET status = 'CLOSED' WHERE id = 'MA-1003'");
+        String loc = createOn(app, 10, "r");
+        jdbc.update("UPDATE mortgage_application SET status = 'CLOSED' WHERE id = ?", app);
         try {
             decision(loc, "rev-sara", "\"0\"", "{\"outcome\":\"DECLINED\"}")
                     .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DECLINED"));
         } finally {
-            jdbc.update("UPDATE mortgage_application SET status = 'OPEN' WHERE id = 'MA-1003'");
+            jdbc.update("UPDATE mortgage_application SET status = 'OPEN' WHERE id = ?", app);
         }
     }
 
@@ -417,7 +440,8 @@ class ApiAttackIT {
 
     @Test
     void INV02_decline_gives_etag_1_two_events_microsecond_decidedAt_and_final_state_rejects_everything() throws Exception {
-        String loc = createOnMa1003(30, "r");
+        String app = newApp();
+        String loc = createOn(app, 30, "r");
         MvcResult r = decision(loc, "rev-sara", "\"0\"", "{\"outcome\":\"DECLINED\",\"comment\":\"no\"}").andExpect(status().isOk()).andReturn();
         assertThat(r.getResponse().getHeader("ETag")).isEqualTo("\"1\"");
         String json = r.getResponse().getContentAsString();
@@ -443,17 +467,19 @@ class ApiAttackIT {
 
     @Test
     void INV02_withdraw_gives_etag_1_and_frees_the_slot_for_a_new_request() throws Exception {
-        String loc = createOnMa1003(30, "r");
+        String app = newApp();
+        String loc = createOn(app, 30, "r");
         MvcResult w = mvc.perform(post(loc + "/withdrawal").header("X-User-Id", "rm-erik").header("If-Match", "\"0\"")).andExpect(status().isOk()).andReturn();
         assertThat(w.getResponse().getHeader("ETag")).isEqualTo("\"1\"");
         assertThat(JsonPath.<String>read(w.getResponse().getContentAsString(), "$.events[1].type")).isEqualTo("WITHDRAWN");
-        String again = createOnMa1003(31, "again");
+        String again = createOn(app, 31, "again");
         withdraw(again, 0);
     }
 
     @Test
     void INV05_two_parallel_declines_with_the_same_version_have_exactly_one_winner_and_one_event() throws Exception {
-        String loc = createOnMa1003(30, "r");
+        String app = newApp();
+        String loc = createOn(app, 30, "r");
         List<Integer> codes = parallel(8, () -> decision(loc, "rev-sara", "\"0\"", "{\"outcome\":\"DECLINED\"}")
                 .andReturn().getResponse().getStatus());
         assertThat(codes.stream().filter(c -> c == 200).count()).isEqualTo(1);
@@ -463,7 +489,8 @@ class ApiAttackIT {
 
     @Test
     void INV04_parallel_creates_on_the_same_application_give_one_201_and_the_rest_409_ACTIVE_REQUEST_EXISTS() throws Exception {
-        List<MvcResult> results = parallel(8, () -> createRaw("rm-erik", body("MA-1003", 10, json("r"))).andReturn());
+        String app = newApp();
+        List<MvcResult> results = parallel(8, () -> createRaw("rm-erik", body(app, 10, json("r"))).andReturn());
         List<MvcResult> created = results.stream().filter(r -> r.getResponse().getStatus() == 201).toList();
         assertThat(created).hasSize(1);
         for (MvcResult r : results) {

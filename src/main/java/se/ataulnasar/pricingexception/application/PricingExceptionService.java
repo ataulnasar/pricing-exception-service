@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import se.ataulnasar.pricingexception.domain.Actor;
@@ -32,17 +33,20 @@ public class PricingExceptionService {
     private final PricingExceptionRequestMapper mapper;
     private final PricingProperties properties;
     private final Clock clock;
+    private final IdempotencyService idempotency;
 
     public PricingExceptionService(PricingExceptionRequestRepository requests,
                                    MortgageApplicationRepository applications,
                                    PricingExceptionRequestMapper mapper,
                                    PricingProperties properties,
-                                   Clock clock) {
+                                   Clock clock,
+                                   IdempotencyService idempotency) {
         this.requests = requests;
         this.applications = applications;
         this.mapper = mapper;
         this.properties = properties;
         this.clock = clock;
+        this.idempotency = idempotency;
     }
 
     /** RM submits a request. Role and input are checked by the domain first, then INV-06 and INV-04. */
@@ -60,6 +64,19 @@ public class PricingExceptionService {
 
         PricingExceptionRequestEntity saved = requests.saveAndFlush(mapper.toNewEntity(request));
         return new RequestView(request, saved.getVersion());
+    }
+
+    /**
+     * {@link #create} under an Idempotency-Key: the first call runs the create and stores the rendered
+     * response in the same transaction; later calls with the same body replay it. Not transactional
+     * itself: {@link IdempotencyTransactions} owns the transaction and this method's own
+     * {@code create} joins it.
+     */
+    public IdempotentResult createIdempotently(Actor caller, String key, CreateRequestCommand command,
+                                               Function<RequestView, String> renderBody) {
+        return idempotency.execute(caller.id(), key, command, 201,
+                () -> create(caller, command.applicationId(), command.discountBps(), command.reason()),
+                renderBody);
     }
 
     @Transactional(readOnly = true)

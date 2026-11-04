@@ -7,12 +7,14 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import se.ataulnasar.pricingexception.application.PricingProperties;
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
 import tools.jackson.databind.type.LogicalType;
 
 @Configuration
+@EnableScheduling
 @EnableConfigurationProperties(PricingProperties.class)
 public class AppConfig {
 
