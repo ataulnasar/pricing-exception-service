@@ -623,4 +623,136 @@ class PricingExceptionControllerTest {
                 .andExpect(jsonPath("$.status").value("WITHDRAWN"))
                 .andExpect(jsonPath("$.events.length()").value(2));
     }
+
+    // ---------- supersede (Phase 5) ----------
+
+    private ResultActions supersede(String user, String ifMatch, String body, String key) throws Exception {
+        MockHttpServletRequestBuilder b = post(BASE + "/" + ID + "/supersessions")
+                .contentType(MediaType.APPLICATION_JSON).content(body);
+        if (user != null) b.header("X-User-Id", user);
+        if (ifMatch != null) b.header("If-Match", ifMatch);
+        if (key != null) b.header("Idempotency-Key", key);
+        return mvc.perform(b);
+    }
+
+    private static final String SUPERSEDE_BODY = "{\"discountBps\":30,\"reason\":\"Revised after talk\"}";
+
+    @Test
+    void INV05_api_supersede_without_if_match_is_428_and_service_not_called() throws Exception {
+        problem(supersede("rm-anna", null, SUPERSEDE_BODY, null), 428, "IF_MATCH_REQUIRED");
+        problem(supersede("rm-anna", null, SUPERSEDE_BODY, "some-key"), 428, "IF_MATCH_REQUIRED");
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void INV05_api_supersede_malformed_if_match_is_400_and_service_not_called() throws Exception {
+        problem(supersede("rm-anna", "*", SUPERSEDE_BODY, null), 400, "MALFORMED_REQUEST");
+        problem(supersede("rm-anna", "2", SUPERSEDE_BODY, null), 400, "MALFORMED_REQUEST");
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void api_supersede_without_user_is_401() throws Exception {
+        problem(supersede(null, "\"0\"", SUPERSEDE_BODY, null), 401, "UNAUTHENTICATED");
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void api_supersede_passes_if_match_as_expected_version_and_returns_201_with_new_request() throws Exception {
+        UUID newId = UUID.fromString("00000000-0000-0000-0000-000000000009");
+        PricingExceptionRequest replacement = PricingExceptionRequest.submit(newId, "MA-1002", ANNA,
+                DiscountBps.of(30, 100), new Reason("Revised after talk"), ID, CLOCK);
+        when(service.supersede(any(), any(), anyLong(), anyInt(), anyString()))
+                .thenReturn(new RequestView(replacement, 0));
+
+        supersede("rm-anna", "\"2\"", SUPERSEDE_BODY, null)
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/pricing-exceptions/" + newId))
+                .andExpect(header().string("ETag", "\"0\""))
+                .andExpect(jsonPath("$.id").value(newId.toString()))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.supersedesId").value(ID.toString()))
+                .andExpect(jsonPath("$.discountBps").value(30))
+                .andExpect(jsonPath("$.reason").value("Revised after talk"));
+
+        verify(service).supersede(ANNA, ID, 2L, 30, "Revised after talk");
+        verify(service, never()).supersedeIdempotently(any(), any(), any(), any());
+    }
+
+    @Test
+    void api_supersede_with_idempotency_key_uses_idempotent_path_and_returns_stored_response() throws Exception {
+        UUID newId = UUID.fromString("00000000-0000-0000-0000-000000000009");
+        when(service.supersedeIdempotently(any(), anyString(), any(), any()))
+                .thenReturn(new se.ataulnasar.pricingexception.application.IdempotentResult(
+                        201, "{\"stored\":true}", newId, 0, true));
+
+        supersede("rm-anna", "\"2\"", SUPERSEDE_BODY, "key-1")
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/pricing-exceptions/" + newId))
+                .andExpect(header().string("ETag", "\"0\""))
+                .andExpect(header().string("Idempotent-Replayed", "true"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(content().string("{\"stored\":true}"));
+
+        ArgumentCaptor<se.ataulnasar.pricingexception.application.SupersedeCommand> cmd =
+                ArgumentCaptor.forClass(se.ataulnasar.pricingexception.application.SupersedeCommand.class);
+        verify(service).supersedeIdempotently(eq(ANNA), eq("key-1"), cmd.capture(), any());
+        assertThat(cmd.getValue()).isEqualTo(
+                new se.ataulnasar.pricingexception.application.SupersedeCommand(ID, 2L, 30, "Revised after talk"));
+        verify(service, never()).supersede(any(), any(), anyLong(), anyInt(), anyString());
+    }
+
+    @Test
+    void api_supersede_first_idempotent_response_has_no_replayed_header() throws Exception {
+        UUID newId = UUID.fromString("00000000-0000-0000-0000-000000000009");
+        when(service.supersedeIdempotently(any(), anyString(), any(), any()))
+                .thenReturn(new se.ataulnasar.pricingexception.application.IdempotentResult(
+                        201, "{}", newId, 0, false));
+
+        supersede("rm-anna", "\"0\"", SUPERSEDE_BODY, "key-2")
+                .andExpect(status().isCreated())
+                .andExpect(header().doesNotExist("Idempotent-Replayed"));
+    }
+
+    @Test
+    void api_supersede_idempotency_key_length_is_1_to_128() throws Exception {
+        problem(supersede("rm-anna", "\"0\"", SUPERSEDE_BODY, "k".repeat(129)), 400, "MALFORMED_REQUEST");
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void api_supersede_blank_reason_is_422_VALIDATION_FAILED_and_service_not_called() throws Exception {
+        supersede("rm-anna", "\"0\"", "{\"discountBps\":30,\"reason\":\"   \"}", null)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("reason"));
+        problem(supersede("rm-anna", "\"0\"", "{\"discountBps\":30}", null), 422, "VALIDATION_FAILED");
+        problem(supersede("rm-anna", "\"0\"", "{\"reason\":\"r\"}", null), 422, "VALIDATION_FAILED");
+        problem(supersede("rm-anna", "\"0\"", "{\"discountBps\":30,\"reason\":\"" + "x".repeat(501) + "\"}", null),
+                422, "VALIDATION_FAILED");
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void api_supersede_body_is_validated_before_if_match() throws Exception {
+        problem(supersede("rm-anna", null, "{\"discountBps\":30,\"reason\":\"\"}", null), 422, "VALIDATION_FAILED");
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void api_supersede_domain_errors_are_mapped() throws Exception {
+        when(service.supersede(any(), any(), anyLong(), anyInt(), anyString()))
+                .thenThrow(new ForbiddenActionException(ForbiddenActionException.NOT_OWNER, "not yours"))
+                .thenThrow(new InvalidTransitionException(RequestStatus.APPROVED, "supersede"))
+                .thenThrow(new ValidationException(ValidationException.INVALID_DISCOUNT, "bad"))
+                .thenThrow(new VersionMismatchException(0, 1))
+                .thenThrow(new NotFoundException("REQUEST_NOT_FOUND", "none"))
+                .thenThrow(new ConflictException("APPLICATION_NOT_OPEN", "closed"));
+        problem(supersede("rm-anna", "\"0\"", SUPERSEDE_BODY, null), 403, "NOT_OWNER");
+        problem(supersede("rm-anna", "\"0\"", SUPERSEDE_BODY, null), 409, "INVALID_TRANSITION");
+        problem(supersede("rm-anna", "\"0\"", SUPERSEDE_BODY, null), 422, "INVALID_DISCOUNT");
+        problem(supersede("rm-anna", "\"0\"", SUPERSEDE_BODY, null), 412, "VERSION_MISMATCH");
+        problem(supersede("rm-anna", "\"0\"", SUPERSEDE_BODY, null), 404, "REQUEST_NOT_FOUND");
+        problem(supersede("rm-anna", "\"0\"", SUPERSEDE_BODY, null), 409, "APPLICATION_NOT_OPEN");
+    }
 }

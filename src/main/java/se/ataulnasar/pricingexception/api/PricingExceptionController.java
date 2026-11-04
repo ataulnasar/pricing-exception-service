@@ -19,6 +19,7 @@ import se.ataulnasar.pricingexception.application.CreateRequestCommand;
 import se.ataulnasar.pricingexception.application.IdempotentResult;
 import se.ataulnasar.pricingexception.application.PricingExceptionService;
 import se.ataulnasar.pricingexception.application.RequestView;
+import se.ataulnasar.pricingexception.application.SupersedeCommand;
 import se.ataulnasar.pricingexception.domain.Actor;
 import se.ataulnasar.pricingexception.domain.RequestStatus;
 import tools.jackson.databind.json.JsonMapper;
@@ -59,13 +60,23 @@ public class PricingExceptionController {
                     .eTag(etag(view))
                     .body(PricingExceptionResponse.from(view));
         }
+        String key = requireValidKey(idempotencyKey);
+        IdempotentResult result = service.createIdempotently(caller, key,
+                new CreateRequestCommand(body.applicationId(), body.discountBps(), body.reason()),
+                view -> json.writeValueAsString(PricingExceptionResponse.from(view)));
+        return replayable(result);
+    }
+
+    private static String requireValidKey(String idempotencyKey) {
         String key = idempotencyKey.trim();
         if (key.isEmpty() || key.length() > MAX_KEY_LENGTH) {
             throw new MalformedRequestException(IDEMPOTENCY_KEY + " must be 1 to " + MAX_KEY_LENGTH + " characters");
         }
-        IdempotentResult result = service.createIdempotently(caller, key,
-                new CreateRequestCommand(body.applicationId(), body.discountBps(), body.reason()),
-                view -> json.writeValueAsString(PricingExceptionResponse.from(view)));
+        return key;
+    }
+
+    /** The stored (or fresh) response of a keyed command, with Location and ETag derived from it. */
+    private static ResponseEntity<String> replayable(IdempotentResult result) {
         ResponseEntity.BodyBuilder response = ResponseEntity.status(result.status())
                 .location(location(result.requestId()))
                 .eTag("\"" + result.version() + "\"")
@@ -103,6 +114,30 @@ public class PricingExceptionController {
                                                              @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch) {
         long expectedVersion = IfMatch.requiredVersion(ifMatch);
         return withEtag(service.withdraw(caller, id, expectedVersion));
+    }
+
+    /**
+     * Supersede (design decision 1): replaces a PENDING request with new terms. Owner RM only,
+     * If-Match required, Idempotency-Key optional with the same semantics as create.
+     */
+    @PostMapping("/{id}/supersessions")
+    public ResponseEntity<?> supersede(Actor caller,
+                                       @PathVariable UUID id,
+                                       @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
+                                       @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey,
+                                       @Valid @RequestBody SupersedeBody body) {
+        long expectedVersion = IfMatch.requiredVersion(ifMatch);
+        if (idempotencyKey == null) {
+            RequestView view = service.supersede(caller, id, expectedVersion, body.discountBps(), body.reason());
+            return ResponseEntity.created(location(view.request().id()))
+                    .eTag(etag(view))
+                    .body(PricingExceptionResponse.from(view));
+        }
+        String key = requireValidKey(idempotencyKey);
+        IdempotentResult result = service.supersedeIdempotently(caller, key,
+                new SupersedeCommand(id, expectedVersion, body.discountBps(), body.reason()),
+                view -> json.writeValueAsString(PricingExceptionResponse.from(view)));
+        return replayable(result);
     }
 
     private static ResponseEntity<PricingExceptionResponse> withEtag(RequestView view) {

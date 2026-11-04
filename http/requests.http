@@ -64,3 +64,55 @@ X-User-Id: rm-anna
 POST {{host}}/api/pricing-exceptions/00000000-0000-0000-0000-000000000002/withdrawal
 X-User-Id: rm-anna
 If-Match: "99"
+
+### 7. Supersede (design decision 1): the owner RM replaces a PENDING request with new terms.
+### Create a fresh request on MA-1003 first if the slot is free again, or use the seed PENDING request on MA-1002.
+# @name supersede
+POST {{host}}/api/pricing-exceptions/00000000-0000-0000-0000-000000000002/supersessions
+X-User-Id: rm-anna
+If-Match: "0"
+Idempotency-Key: demo-supersede-1
+Content-Type: application/json
+
+{
+  "discountBps": 60,
+  "reason": "Competing offer from another bank, revised after discussion with the customer"
+}
+
+> {% client.global.set("newId", response.body.id); %}
+
+### 7b. The old request is now SUPERSEDED with two events and supersededById set
+GET {{host}}/api/pricing-exceptions/00000000-0000-0000-0000-000000000002
+X-User-Id: rm-anna
+
+### 7c. Replay of the same supersede (same key, body and If-Match) -> 201 + Idempotent-Replayed: true
+POST {{host}}/api/pricing-exceptions/00000000-0000-0000-0000-000000000002/supersessions
+X-User-Id: rm-anna
+If-Match: "0"
+Idempotency-Key: demo-supersede-1
+Content-Type: application/json
+
+{
+  "discountBps": 60,
+  "reason": "Competing offer from another bank, revised after discussion with the customer"
+}
+
+### 8. Mortgage process reads the approved discount (MA-1001 has the seed APPROVED request)
+GET {{host}}/api/applications/MA-1001/approved-discount
+X-User-Id: mortgage-system
+
+### 8b. No approved discount yet -> 404 NO_APPROVED_DISCOUNT
+GET {{host}}/api/applications/MA-1002/approved-discount
+X-User-Id: mortgage-system
+
+### 8c. Any other role -> 403 WRONG_ROLE
+GET {{host}}/api/applications/MA-1001/approved-discount
+X-User-Id: rm-anna
+
+### 9. Seed data for the UI
+GET {{host}}/api/applications
+X-User-Id: rm-anna
+
+###
+GET {{host}}/api/users
+X-User-Id: rm-anna

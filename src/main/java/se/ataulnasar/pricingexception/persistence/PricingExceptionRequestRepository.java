@@ -40,6 +40,10 @@ public interface PricingExceptionRequestRepository extends Repository<PricingExc
     @EntityGraph(attributePaths = "events")
     List<PricingExceptionRequestEntity> findByApplicationIdAndStatus(String applicationId, RequestStatus status);
 
+    /** The request that replaced the given one, if any (the reverse of supersedes_id). */
+    @EntityGraph(attributePaths = "events")
+    Optional<PricingExceptionRequestEntity> findBySupersedesId(UUID supersedesId);
+
     /**
      * The active (PENDING or APPROVED) request of an application, if any. At most one row per
      * application has a non-null active_application_id (INV-04). Explicit query so that a null

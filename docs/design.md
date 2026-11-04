@@ -51,12 +51,12 @@ DECLINED request, each with its events.
 | Method and path | Who | What | Main responses |
 |---|---|---|---|
 | `POST /api/pricing-exceptions` | RM | Create. Body: `applicationId`, `discountBps`, `reason` | 201 + `Location` + `ETag`; 404 application; 409 `ACTIVE_REQUEST_EXISTS` or `APPLICATION_NOT_OPEN`; 422 validation / key reuse |
-| `GET /api/pricing-exceptions/{id}` | anyone | Request + status + decision + full history | 200 + `ETag`; 404 |
+| `GET /api/pricing-exceptions/{id}` | anyone | Request + status + decision + full history, incl. `supersedesId` / `supersededById` | 200 + `ETag`; 404 |
 | `GET /api/pricing-exceptions?status=&applicationId=` | anyone | List / filter | 200 |
 | `POST /api/pricing-exceptions/{id}/decision` | REVIEWER | Body: `outcome` (APPROVED / DECLINED), `comment` | 200; 403 self-review / over limit / wrong role; 409 not pending; 412; 428 |
 | `POST /api/pricing-exceptions/{id}/withdrawal` | owner RM | Withdraw a pending request | 200; 403; 409; 412; 428 |
-| `POST /api/pricing-exceptions/{id}/supersessions` | owner RM | Body: `discountBps`, `reason`. Replaces a pending request | 201 new request; 403; 409; 412; 428 |
-| `GET /api/applications/{id}/approved-discount` | MORTGAGE_PROCESS | `{applicationId, discountBps, requestId, decidedBy, decidedAt}` | 200; 403; 404 `NO_APPROVED_DISCOUNT` |
+| `POST /api/pricing-exceptions/{id}/supersessions` | owner RM | Body: `discountBps`, `reason`. Replaces a pending request; accepts `Idempotency-Key` | 201 new request + `Location` + `ETag`; 403; 404; 409 `INVALID_TRANSITION` / `APPLICATION_NOT_OPEN`; 412; 422; 428 |
+| `GET /api/applications/{id}/approved-discount` | MORTGAGE_PROCESS | `{applicationId, discountBps, requestId, decidedBy, decidedAt}` | 200; 403; 404 `APPLICATION_NOT_FOUND` / `NO_APPROVED_DISCOUNT` |
 | `GET /api/applications`, `GET /api/users` | anyone | Seed data for the UI | 200 |
 
 Errors use ProblemDetail (RFC 9457) with an extra `code` field.
@@ -95,6 +95,7 @@ plain-text `detail` and the extra property `code`:
 | 401 | `UNAUTHENTICATED` | Missing or unknown `X-User-Id` |
 | 403 | `WRONG_ROLE`, `SELF_REVIEW`, `OVER_APPROVAL_LIMIT`, `NOT_OWNER` | Domain `ForbiddenActionException` (INV-03, owner rules) |
 | 404 | `REQUEST_NOT_FOUND`, `APPLICATION_NOT_FOUND` | Unknown request or application id |
+| 404 | `NO_APPROVED_DISCOUNT` | Known application without an APPROVED request (approved-discount endpoint) |
 | 409 | `INVALID_TRANSITION` | Request is not PENDING (INV-05) |
 | 409 | `ACTIVE_REQUEST_EXISTS` | Application already has a PENDING or APPROVED request (INV-04) |
 | 409 | `APPLICATION_NOT_OPEN` | Application is not OPEN on create or approve (INV-06) |
@@ -111,6 +112,11 @@ plain-text `detail` and the extra property `code`:
 
 The `ETag` of a request is its version in double quotes, e.g. `"0"`. `If-Match` must carry exactly
 that value; `*`, weak tags, lists, unquoted or zero-padded numbers are 400.
+
+**Supersede** marks the old request SUPERSEDED and flushes before inserting the replacement, so the
+unique active-request index is free for the new row; both happen in one transaction. The new terms are
+validated first, and INV-06 applies to the replacement. Every request representation carries
+`supersedesId` (what it replaced) and `supersededById` (what replaced it), so the link is visible both ways.
 
 **Idempotency-Key** (optional on create and supersede, 1 to 128 characters, scoped per caller): the first
 response (status, `Location`, `ETag`, body) is stored in the same transaction as the request and replayed

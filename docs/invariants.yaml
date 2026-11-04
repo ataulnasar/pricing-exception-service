@@ -47,7 +47,7 @@ invariants:
       Stops duplicate requests, also when a retry arrives without an
       idempotency key, and stops two different discounts being approved.
     tests:
-      - RequestRepositoryTest.INV04_second_active_request_is_rejected
+      - PricingExceptionRequestRepositoryTest.INV04_second_active_request_is_rejected
       - ConcurrencyIT.INV04_parallel_creates_without_key_create_one_request
 
   - id: INV-05
@@ -58,9 +58,9 @@ invariants:
     why: >
       A request is decided once. Two reviewers can never both decide it.
     tests:
-      - PricingExceptionRequestTest.INV05_transition_table
+      - StatusCommandMatrixTest.INV05_transition_table
       - ConcurrencyIT.INV05_two_parallel_decisions_only_one_wins
-      - DecisionApiTest.INV05_missing_if_match_returns_428
+      - WorkflowIT.INV05_decision_without_if_match_is_428_end_to_end
 
   - id: INV-06
     rule: >

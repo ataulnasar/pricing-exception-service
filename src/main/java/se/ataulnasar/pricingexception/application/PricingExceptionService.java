@@ -9,9 +9,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import se.ataulnasar.pricingexception.domain.Actor;
 import se.ataulnasar.pricingexception.domain.DiscountBps;
+import se.ataulnasar.pricingexception.domain.ForbiddenActionException;
 import se.ataulnasar.pricingexception.domain.PricingExceptionRequest;
 import se.ataulnasar.pricingexception.domain.Reason;
 import se.ataulnasar.pricingexception.domain.RequestStatus;
+import se.ataulnasar.pricingexception.domain.Role;
 import se.ataulnasar.pricingexception.persistence.ApplicationStatus;
 import se.ataulnasar.pricingexception.persistence.MortgageApplicationEntity;
 import se.ataulnasar.pricingexception.persistence.MortgageApplicationRepository;
@@ -131,6 +133,56 @@ public class PricingExceptionService {
         return persist(request, entity);
     }
 
+    /**
+     * The owner RM replaces a PENDING request with new terms (INV-01). The old request is marked
+     * SUPERSEDED and flushed first, which frees the application's active slot, then the new request
+     * is inserted with {@code supersedesId} pointing at the old one; both in one transaction. The new
+     * terms are validated before anything changes, and INV-06 applies to the new request.
+     */
+    @Transactional
+    public RequestView supersede(Actor caller, UUID oldId, long expectedVersion, int discountBps, String reason) {
+        DiscountBps newDiscount = DiscountBps.of(discountBps, properties.maxDiscountBps());
+        Reason newReason = new Reason(reason);
+
+        PricingExceptionRequestEntity oldEntity = load(oldId);
+        requireVersion(oldEntity, expectedVersion);
+        PricingExceptionRequest old = mapper.toDomain(oldEntity);
+        old.markSuperseded(caller, clock);
+        requireOpen(loadApplication(oldEntity.getApplicationId()));
+        mapper.applyTo(old, oldEntity);
+        requests.saveAndFlush(oldEntity); // active_application_id is now NULL; the unique index is free
+
+        PricingExceptionRequest replacement = PricingExceptionRequest.submit(
+                UUID.randomUUID(), old.applicationId(), caller, newDiscount, newReason, old.id(), clock);
+        PricingExceptionRequestEntity saved = requests.saveAndFlush(mapper.toNewEntity(replacement));
+        return new RequestView(replacement, saved.getVersion());
+    }
+
+    /** {@link #supersede} under an Idempotency-Key; see {@link #createIdempotently}. */
+    public IdempotentResult supersedeIdempotently(Actor caller, String key, SupersedeCommand command,
+                                                  Function<RequestView, String> renderBody) {
+        return idempotency.execute(caller.id(), key, command, 201,
+                () -> supersede(caller, command.requestId(), command.expectedVersion(),
+                        command.discountBps(), command.reason()),
+                renderBody);
+    }
+
+    /** What the mortgage process reads (design decision 5). Only MORTGAGE_PROCESS may call it. */
+    @Transactional(readOnly = true)
+    public ApprovedDiscount approvedDiscount(Actor caller, String applicationId) {
+        if (caller.role() != Role.MORTGAGE_PROCESS) {
+            throw new ForbiddenActionException(ForbiddenActionException.WRONG_ROLE,
+                    "only MORTGAGE_PROCESS can read the approved discount, " + caller.id() + " is " + caller.role());
+        }
+        loadApplication(applicationId);
+        PricingExceptionRequestEntity approved = requests.findByApplicationIdAndStatus(applicationId, RequestStatus.APPROVED)
+                .stream().findFirst()
+                .orElseThrow(() -> new NotFoundException(NotFoundException.NO_APPROVED_DISCOUNT,
+                        "mortgage application " + applicationId + " has no approved pricing exception"));
+        return new ApprovedDiscount(applicationId, approved.getApprovedDiscountBps(), approved.getId(),
+                approved.getDecidedBy(), approved.getDecidedAt());
+    }
+
     // ---------- helpers ----------
 
     private RequestView persist(PricingExceptionRequest request, PricingExceptionRequestEntity entity) {
@@ -140,7 +192,10 @@ public class PricingExceptionService {
     }
 
     private RequestView view(PricingExceptionRequestEntity entity) {
-        return new RequestView(mapper.toDomain(entity), entity.getVersion());
+        UUID supersededById = entity.getStatus() == RequestStatus.SUPERSEDED
+                ? requests.findBySupersedesId(entity.getId()).map(PricingExceptionRequestEntity::getId).orElse(null)
+                : null;
+        return new RequestView(mapper.toDomain(entity), entity.getVersion(), supersededById);
     }
 
     private PricingExceptionRequestEntity load(UUID id) {
