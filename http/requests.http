@@ -1,0 +1,66 @@
+### Pricing exception service: happy path (default profile, H2 + seed data).
+### Run the app with ./mvnw spring-boot:run. Works in IntelliJ / VS Code REST Client.
+@host = http://localhost:8080
+@rm = rm-erik
+@reviewer = rev-sara
+
+### 1. RM creates a request for an OPEN application without an active request (MA-1003)
+# @name create
+POST {{host}}/api/pricing-exceptions
+X-User-Id: {{rm}}
+Content-Type: application/json
+
+{
+  "applicationId": "MA-1003",
+  "discountBps": 40,
+  "reason": "Long-standing customer, competing offer from another bank"
+}
+
+> {% client.global.set("id", response.body.id); client.global.set("etag", response.headers.valueOf("ETag")); %}
+
+### 2. Read it back: PENDING, one SUBMITTED event, ETag "0"
+GET {{host}}/api/pricing-exceptions/{{id}}
+X-User-Id: {{rm}}
+
+### 3. Reviewer approves with If-Match = the ETag (decidedBy comes from X-User-Id, never from the body)
+# @name approve
+POST {{host}}/api/pricing-exceptions/{{id}}/decision
+X-User-Id: {{reviewer}}
+If-Match: {{etag}}
+Content-Type: application/json
+
+{
+  "outcome": "APPROVED",
+  "comment": "Within my limit"
+}
+
+> {% client.global.set("etag", response.headers.valueOf("ETag")); %}
+
+### 4. Read it back: APPROVED, two events, approvedDiscountBps = 40, ETag "1"
+GET {{host}}/api/pricing-exceptions/{{id}}
+X-User-Id: {{reviewer}}
+
+### 5. List all PENDING requests (seed has one on MA-1002)
+GET {{host}}/api/pricing-exceptions?status=PENDING
+X-User-Id: {{rm}}
+
+### 6. Error examples
+### 6a. Missing X-User-Id -> 401 UNAUTHENTICATED
+GET {{host}}/api/pricing-exceptions/{{id}}
+
+### 6b. Second decision on an APPROVED request -> 409 INVALID_TRANSITION
+POST {{host}}/api/pricing-exceptions/{{id}}/decision
+X-User-Id: rev-johan
+If-Match: {{etag}}
+Content-Type: application/json
+
+{ "outcome": "DECLINED" }
+
+### 6c. Withdraw the seed PENDING request without If-Match -> 428 IF_MATCH_REQUIRED
+POST {{host}}/api/pricing-exceptions/00000000-0000-0000-0000-000000000002/withdrawal
+X-User-Id: rm-anna
+
+### 6d. Withdraw it with a stale If-Match -> 412 VERSION_MISMATCH
+POST {{host}}/api/pricing-exceptions/00000000-0000-0000-0000-000000000002/withdrawal
+X-User-Id: rm-anna
+If-Match: "99"

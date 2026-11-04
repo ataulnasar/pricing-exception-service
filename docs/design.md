@@ -45,6 +45,7 @@ DECLINED request, each with its events.
 - `discountBps`: whole number, 1 to `pricing.max-discount-bps` (default 100).
 - `reason`: not blank, max 500 characters.
 - `comment` on decisions: optional, max 500 characters.
+- "Characters" are UTF-16 units (`String.length()`, same as `@Size`), never more than the DB column.
 
 ## HTTP API
 | Method and path | Who | What | Main responses |
@@ -83,3 +84,34 @@ Errors use ProblemDetail (RFC 9457) with an extra `code` field.
 - **Event types** (`request_event.type`, one per status change): `SUBMITTED`, `APPROVED`, `DECLINED`, `WITHDRAWN`, `SUPERSEDED`
 - **Check order for decisions** (approve / decline): status, then role, then self-review, then approval limit.
 - **INV-06** (application must be OPEN) is checked in the application service, not in the domain.
+
+## API error codes
+Every error is an RFC 9457 ProblemDetail (`application/problem+json`) with `status`, `title`,
+plain-text `detail` and the extra property `code`:
+
+| HTTP | `code` | When |
+|---|---|---|
+| 400 | `MALFORMED_REQUEST` | Unreadable JSON, non-UUID id, unparsable `If-Match` |
+| 401 | `UNAUTHENTICATED` | Missing or unknown `X-User-Id` |
+| 403 | `WRONG_ROLE`, `SELF_REVIEW`, `OVER_APPROVAL_LIMIT`, `NOT_OWNER` | Domain `ForbiddenActionException` (INV-03, owner rules) |
+| 404 | `REQUEST_NOT_FOUND`, `APPLICATION_NOT_FOUND` | Unknown request or application id |
+| 409 | `INVALID_TRANSITION` | Request is not PENDING (INV-05) |
+| 409 | `ACTIVE_REQUEST_EXISTS` | Application already has a PENDING or APPROVED request (INV-04) |
+| 409 | `APPLICATION_NOT_OPEN` | Application is not OPEN on create or approve (INV-06) |
+| 409 | `CONCURRENT_MODIFICATION` | Optimistic lock lost inside the transaction |
+| 409 | `DATA_CONFLICT` | Any other database constraint violation (details only in the server log) |
+| 412 | `VERSION_MISMATCH` | `If-Match` is not the current version (INV-05) |
+| 422 | `VALIDATION_FAILED` | Bean Validation on the body; `errors[]` lists `{field, message}` |
+| 422 | `INVALID_DISCOUNT`, `INVALID_REASON`, `INVALID_COMMENT` | Domain `ValidationException` |
+| 428 | `IF_MATCH_REQUIRED` | Decision, withdrawal or supersede without `If-Match` |
+| 500 | `INTERNAL_ERROR` | Unexpected error; no details are exposed |
+| any | `HTTP_<status>` | Spring's own errors: unknown route (404), wrong method (405, with `Allow`), unsupported media type (415) |
+
+The `ETag` of a request is its version in double quotes, e.g. `"0"`. `If-Match` must carry exactly
+that value; `*`, weak tags, lists, unquoted or zero-padded numbers are 400.
+
+**Check order of an HTTP request:** identity (401) → request shape: body validation (400/422), then
+`If-Match` presence and form (428/400) → the use case: existence (404), version (412), then the domain
+rules in their documented order (403/409/422). So an invalid body is reported before a missing
+`If-Match`, a missing `If-Match` before an unknown request id, and a stale version before a
+non-PENDING status.
