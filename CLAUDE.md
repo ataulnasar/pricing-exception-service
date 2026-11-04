@@ -65,4 +65,4 @@ If a task would break one of these rules, **stop and ask**. Do not work around i
 
 ## Commits
 - Conventional commits: `feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`.
-- If an agent wrote most of the change, add the trailer: `Assisted-by: <agent/model>`.
+- Do not add `Assisted-by` or `Co-authored-by` trailers. AI usage is recorded in `docs/ai-usage.md`.
