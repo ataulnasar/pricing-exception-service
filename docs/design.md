@@ -74,3 +74,12 @@ Errors use ProblemDetail (RFC 9457) with an extra `code` field.
 
 ## Packages (`se.ataulnasar.pricingexception`)
 `domain` (plain Java) · `application` (services) · `api` (controllers, DTOs) · `persistence` (JPA)
+
+## Domain error codes and events
+- **Error codes** (stable `code` on domain exceptions, mapped to ProblemDetail in `api`):
+  - `ForbiddenActionException`: `WRONG_ROLE`, `SELF_REVIEW`, `OVER_APPROVAL_LIMIT`, `NOT_OWNER`
+  - `InvalidTransitionException`: `INVALID_TRANSITION`
+  - `ValidationException`: `INVALID_DISCOUNT`, `INVALID_REASON`, `INVALID_COMMENT`
+- **Event types** (`request_event.type`, one per status change): `SUBMITTED`, `APPROVED`, `DECLINED`, `WITHDRAWN`, `SUPERSEDED`
+- **Check order for decisions** (approve / decline): status, then role, then self-review, then approval limit.
+- **INV-06** (application must be OPEN) is checked in the application service, not in the domain.
