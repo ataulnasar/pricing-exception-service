@@ -77,6 +77,94 @@ public final class PricingExceptionRequest {
         return request;
     }
 
+    /**
+     * Rebuilds a stored request without running commands or writing events. For the persistence
+     * mapper only. Checks the cheap consistency rules: the history starts with SUBMITTED, and
+     * {@code approvedDiscount} is set exactly when the status is APPROVED and then equals the
+     * requested discount (INV-01).
+     */
+    public static PricingExceptionRequest reconstitute(UUID id, String applicationId, String requestedBy,
+                                                       DiscountBps discount, Reason reason, Instant createdAt,
+                                                       UUID supersedesId, RequestStatus status,
+                                                       String decidedBy, Instant decidedAt, String decisionComment,
+                                                       DiscountBps approvedDiscount, List<RequestEvent> events) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(applicationId, "applicationId");
+        Objects.requireNonNull(requestedBy, "requestedBy");
+        Objects.requireNonNull(discount, "discount");
+        Objects.requireNonNull(reason, "reason");
+        Objects.requireNonNull(createdAt, "createdAt");
+        Objects.requireNonNull(status, "status");
+        Objects.requireNonNull(events, "events");
+        checkHistory(id, status, events);
+        if (id.equals(supersedesId)) {
+            throw new IllegalArgumentException("request " + id + " cannot supersede itself");
+        }
+        if (status == RequestStatus.APPROVED) {
+            if (!discount.equals(approvedDiscount)) {
+                throw new IllegalArgumentException("APPROVED request " + id
+                        + " must have approvedDiscount equal to its discount " + discount.value());
+            }
+        } else if (approvedDiscount != null) {
+            throw new IllegalArgumentException("request " + id + " in status " + status
+                    + " must not have an approvedDiscount");
+        }
+        boolean decided = status == RequestStatus.APPROVED || status == RequestStatus.DECLINED;
+        if (decided && (decidedBy == null || decidedAt == null)) {
+            throw new IllegalArgumentException("request " + id + " in status " + status
+                    + " must have decidedBy and decidedAt");
+        }
+        if (!decided && (decidedBy != null || decidedAt != null || decisionComment != null)) {
+            throw new IllegalArgumentException("request " + id + " in status " + status
+                    + " must not have decision fields");
+        }
+        if (decided && decidedBy.equals(requestedBy)) {
+            throw new IllegalArgumentException("request " + id + " was decided by its requester (INV-03)");
+        }
+
+        PricingExceptionRequest request = new PricingExceptionRequest(
+                id, applicationId, requestedBy, discount, reason, createdAt, supersedesId);
+        request.status = status;
+        request.decidedBy = decidedBy;
+        request.decidedAt = decidedAt;
+        request.decisionComment = decisionComment;
+        request.approvedDiscount = approvedDiscount;
+        request.events.addAll(events);
+        return request;
+    }
+
+    /**
+     * The history this state machine can produce: one SUBMITTED event first, then at most one
+     * transition out of PENDING whose target is the current status (INV-02, INV-05).
+     */
+    private static void checkHistory(UUID id, RequestStatus status, List<RequestEvent> events) {
+        if (events.isEmpty() || events.get(0).type() != RequestEvent.Type.SUBMITTED) {
+            throw new IllegalArgumentException("history of request " + id + " must start with a SUBMITTED event");
+        }
+        RequestEvent previous = null;
+        for (int i = 0; i < events.size(); i++) {
+            RequestEvent e = events.get(i);
+            Objects.requireNonNull(e, "event");
+            if (!id.equals(e.requestId())) {
+                throw new IllegalArgumentException("event " + i + " belongs to request " + e.requestId()
+                        + ", not " + id);
+            }
+            if (i > 0 && e.type() == RequestEvent.Type.SUBMITTED) {
+                throw new IllegalArgumentException("history of request " + id + " has more than one SUBMITTED event");
+            }
+            if (i < events.size() - 1 && e.toStatus() != RequestStatus.PENDING) {
+                throw new IllegalArgumentException("history of request " + id + " continues after a final status");
+            }
+            // No check on occurredAt order: a clock stepping backwards between two commands must not
+            // make a stored request unreadable. Persistence orders events by insertion id.
+            previous = e;
+        }
+        if (previous.toStatus() != status) {
+            throw new IllegalArgumentException("history of request " + id + " ends in " + previous.toStatus()
+                    + " but status is " + status);
+        }
+    }
+
     // ---------- commands ----------
 
     /** Reviewer approves. Stores the discount that was reviewed as {@code approvedDiscount} (INV-01). */
