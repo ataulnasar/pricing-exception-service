@@ -220,8 +220,7 @@
       const open = () => run(() => select(r.id));
       const row = el('tr', {
         class: 'selectable' + (state.selected && state.selected.id === r.id ? ' selected' : ''),
-        tabindex: 0,
-        role: 'button',
+        tabindex: 0,                         // keyboard reachable; no button role, Pico would style the row as a button
         'aria-label': 'Open request ' + r.id,
         onclick: open,
         onkeydown: (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } },

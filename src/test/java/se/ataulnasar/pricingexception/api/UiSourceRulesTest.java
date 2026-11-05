@@ -138,4 +138,15 @@ class UiSourceRulesTest {
         String renderList = functionBody(js, "renderList");
         assertThat(renderList).containsPattern("\\$\\(\\s*'request-list'\\s*\\)").contains("'No requests.'");
     }
+
+    @Test
+    void ui_list_rows_are_focusable_but_not_styled_as_buttons() throws IOException {
+        String js = read("app.js");
+        String html = read("index.html");
+        // Pico styles role=button as a dark button, which made the status text unreadable.
+        assertThat(js).doesNotContainPattern("role\\s*[:=]\\s*[\"']button[\"']");
+        String renderList = functionBody(js, "renderList");
+        assertThat(renderList).contains("tabindex: 0").contains("onkeydown");
+        assertThat(html).containsPattern("tr\\.selected\\s*[{,]").containsPattern("tr\\.selectable:hover\\s*[{,]");
+    }
 }

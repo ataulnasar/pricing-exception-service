@@ -13,8 +13,9 @@
     #error { color: #b00020; min-height: 1.5rem; white-space: pre-wrap; }
     #error:empty { display: none; }
     tr.selectable { cursor: pointer; }
-    tr.selectable:focus { outline: 2px solid var(--pico-primary); }
-    tr.selected { outline: 2px solid var(--pico-primary); }
+    tr.selectable:hover { background-color: var(--pico-secondary-background, rgba(127, 127, 127, 0.12)); }
+    tr.selectable:focus-visible { outline: 2px solid var(--pico-primary); outline-offset: -2px; }
+    tr.selected { box-shadow: inset 4px 0 0 var(--pico-primary); background-color: var(--pico-secondary-background, rgba(127, 127, 127, 0.12)); }
     .muted { color: var(--pico-muted-color); font-size: 0.9em; }
     .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; }
     .actions form { display: contents; }
