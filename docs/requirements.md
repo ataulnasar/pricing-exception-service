@@ -28,7 +28,7 @@ The `Proved by` column lists the tests or documents that show each requirement i
 | D2 | Seed data or setup steps to try a realistic workflow | seed migration, `http/requests.http`, `scripts/demo.sh` | ✅ seed: `src/main/resources/db/seed/V1000__local_seed_data.sql`; walkthrough: `http/requests.http`; `scripts/demo.sh`: Phase 6 |
 | D3 | Source in Git, with instructions to run, test and explore | GitHub repo, README | ✅ github.com/ataulnasar/pricing-exception-service; run/test steps in `docs/runbook.md`; full README: Phase 6 |
 | D4 | Short README: the problem, assumptions, scope choices | `README.md` | Phase 6 (docs-writer) |
-| D5 | Evidence that important behaviour is tested | test suite, README "requirement → test" table | ✅ 490+ tests in `./mvnw verify` incl. Postgres; this file; README table: Phase 6 |
+| D5 | Evidence that important behaviour is tested | test suite, README "requirement → test" table | ✅ 476 tests in `./mvnw verify` incl. Postgres; this file; README table: Phase 6 |
 | D6 | Decisions, diagrams, notes and operational guidance for the next engineer | `docs/adr/`, `docs/diagrams/`, `docs/runbook.md` | partly: `docs/design.md`, `docs/invariants.yaml`, `docs/runbook.md`; ADRs and diagrams: Phase 6 |
 
 ## Constraints

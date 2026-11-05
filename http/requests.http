@@ -66,7 +66,7 @@ X-User-Id: rm-anna
 If-Match: "99"
 
 ### 7. Supersede (design decision 1): the owner RM replaces a PENDING request with new terms.
-### Create a fresh request on MA-1003 first if the slot is free again, or use the seed PENDING request on MA-1002.
+### Uses the seed PENDING request on MA-1002 (If-Match "0" on a fresh database). Runs once; afterwards the old request is SUPERSEDED.
 # @name supersede
 POST {{host}}/api/pricing-exceptions/00000000-0000-0000-0000-000000000002/supersessions
 X-User-Id: rm-anna

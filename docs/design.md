@@ -10,7 +10,8 @@ The mortgage application process reads the approved discount.
 ## Key decisions
 1. **Requests never change after submit.** To change the discount, the RM *supersedes*
    a PENDING request: a new request is created (with `supersedesId`) and the old one
-   becomes SUPERSEDED, in one transaction. After a decision, the RM makes a new request.
+   becomes SUPERSEDED, in one transaction. After a decline or withdrawal the RM can make a new
+   request; an approved request keeps the application's single active slot (INV-04).
    An approval stores `approvedDiscountBps` (the value the reviewer saw).
 2. **Idempotency:** `POST` create and supersede accept an `Idempotency-Key` header.
    Same key + same body → replay the first response. Same key + different body → 422.
