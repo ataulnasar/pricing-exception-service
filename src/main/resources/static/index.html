@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pricing exceptions</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.classless.min.css"
+        integrity="sha384-iwhbqwPWB6yOJVIuKNO2XJeI4wLNuRoY1mpvPi+PxCoy3H7dotcMe5IjC67TOHlM" crossorigin="anonymous">
+  <style>
+    main { max-width: 1200px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+    @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+    #error { color: #b00020; min-height: 1.5rem; white-space: pre-wrap; }
+    #error:empty { display: none; }
+    tr.selectable { cursor: pointer; }
+    tr.selectable:focus { outline: 2px solid var(--pico-primary); }
+    tr.selected { outline: 2px solid var(--pico-primary); }
+    .muted { color: var(--pico-muted-color); font-size: 0.9em; }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; }
+    .actions form { display: contents; }
+    .status-PENDING { font-weight: 600; }
+    .status-APPROVED { color: #0a7a2f; font-weight: 600; }
+    .status-DECLINED, .status-WITHDRAWN, .status-SUPERSEDED { color: var(--pico-muted-color); }
+    code.id { font-size: 0.85em; }
+  </style>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header>
+    <nav>
+      <ul><li><strong>Pricing exceptions</strong></li></ul>
+      <ul>
+        <li>
+          <label for="user-select">Acting as
+            <select id="user-select" aria-label="User"></select>
+          </label>
+        </li>
+        <li><span id="user-info" class="muted"></span></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <div id="error" role="alert"></div>
+
+    <div class="row">
+      <section>
+        <h2>Requests</h2>
+        <div class="actions">
+          <label for="status-filter">Status
+            <select id="status-filter">
+              <option value="">all</option>
+              <option value="PENDING">PENDING</option>
+              <option value="APPROVED">APPROVED</option>
+              <option value="DECLINED">DECLINED</option>
+              <option value="WITHDRAWN">WITHDRAWN</option>
+              <option value="SUPERSEDED">SUPERSEDED</option>
+            </select>
+          </label>
+          <button id="refresh" type="button">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Application</th><th>Discount</th><th>Status</th><th>Requested by</th><th>Created</th></tr>
+          </thead>
+          <tbody id="request-list"></tbody>
+        </table>
+
+        <section id="create-section" hidden>
+          <h3>New request</h3>
+          <form id="create-form">
+            <label for="create-application">Application
+              <select id="create-application" required></select>
+            </label>
+            <label for="create-discount">Discount (basis points, 1 to 100)
+              <input id="create-discount" type="number" min="1" max="100" step="1" required>
+            </label>
+            <label for="create-reason">Reason
+              <textarea id="create-reason" rows="3" maxlength="500" required></textarea>
+            </label>
+            <p class="muted">Idempotency-Key: <code id="create-key"></code></p>
+            <button type="submit">Create request</button>
+          </form>
+        </section>
+
+        <section id="lookup-section" hidden>
+          <h3>Approved discount lookup</h3>
+          <form id="lookup-form">
+            <label for="lookup-application">Application
+              <select id="lookup-application" required></select>
+            </label>
+            <button type="submit">Look up</button>
+          </form>
+          <p id="lookup-result"></p>
+        </section>
+      </section>
+
+      <section>
+        <h2>Detail</h2>
+        <div id="detail"><p class="muted">Select a request.</p></div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
