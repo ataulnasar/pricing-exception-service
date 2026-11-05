@@ -266,6 +266,8 @@ for the agent definitions.
 - [docs/invariants.yaml](docs/invariants.yaml): the business rules (INV-01 to INV-06).
 - [docs/adr/](docs/adr/): architecture decision records (ADR-001 to ADR-006).
 - [docs/diagrams/state-machine.md](docs/diagrams/state-machine.md): request states and the supersede sequence.
+- [docs/diagrams/architecture.md](docs/diagrams/architecture.md): system context, layers, decision flow, tables.
+- [docs/diagrams/development-flow.md](docs/diagrams/development-flow.md): how the AI agents and the human built each phase.
 - [docs/runbook.md](docs/runbook.md): configuration, health, error codes, resetting the database, logs, PostgreSQL tests.
 - [docs/requirements.md](docs/requirements.md): the requirements and where each one is proved.
 - [http/requests.http](http/requests.http): the HTTP walkthrough.
