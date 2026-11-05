@@ -1,0 +1,13 @@
+diff --git a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
+index 8f78613..2db5c89 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
++++ b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
+@@ -211,7 +211,7 @@ public final class PricingExceptionRequest {
+         Objects.requireNonNull(clock, "clock");
+         requirePending("withdraw");
+         requireOwner(actor, "withdraw");
+-        transition(RequestStatus.WITHDRAWN, RequestEvent.Type.WITHDRAWN, actor, clock.instant(), null);
++        status = RequestStatus.WITHDRAWN;
+     }
+ 
+     /**

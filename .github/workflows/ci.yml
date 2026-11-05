@@ -35,3 +35,12 @@ jobs:
             grep -q 'skipped="0"' "$report" || { echo "PostgreSQL tests were skipped in $cls:"; grep -o 'tests="[0-9]*"\|skipped="[0-9]*"' "$report"; exit 1; }
             echo "PostgreSQL tests ran in $cls: $(grep -o 'tests="[0-9]*"' "$report")"
           done
+
+  ai-review-agent-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Unit tests of the AI review agent (standard library only, no API key needed)
+        run: python3 -m unittest discover -s agents/tests -v

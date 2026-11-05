@@ -1,0 +1,12 @@
+diff --git a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
+index dc165d7..9f5af5d 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
++++ b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
+@@ -116,7 +116,6 @@ public class PricingExceptionService {
+ 
+         if (decision == Decision.APPROVED) {
+             request.approve(caller, comment, clock);
+-            requireOpen(loadApplication(entity.getApplicationId())); // INV-06, after the domain checks
+         } else {
+             request.decline(caller, comment, clock);
+         }

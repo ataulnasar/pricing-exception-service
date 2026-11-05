@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Python (agents/review.py and its tests)
+__pycache__/
+*.pyc

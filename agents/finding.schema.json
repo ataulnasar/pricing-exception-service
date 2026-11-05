@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AI review result",
+  "type": "object",
+  "required": ["findings"],
+  "properties": {
+    "findings": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["id", "rule", "severity", "file", "line", "problem"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^F[0-9]+$"},
+          "rule": {"type": "string", "minLength": 1, "maxLength": 80},
+          "severity": {"type": "string", "enum": ["high", "medium", "low"]},
+          "file": {"type": "string", "minLength": 1},
+          "line": {"type": "integer", "minimum": 1},
+          "problem": {"type": "string", "minLength": 1, "maxLength": 1000},
+          "suggested_test": {"type": "string", "maxLength": 500}
+        },
+        "additionalProperties": false
+      }
+    },
+    "checked": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

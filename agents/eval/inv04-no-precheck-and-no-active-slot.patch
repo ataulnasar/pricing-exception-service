@@ -1,0 +1,28 @@
+diff --git a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
+index dc165d7..8fc051a 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
++++ b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
+@@ -59,10 +59,6 @@ public class PricingExceptionService {
+                 DiscountBps.of(discountBps, properties.maxDiscountBps()), new Reason(reason), null, clock);
+ 
+         requireOpen(loadApplication(applicationId));
+-        requests.findByActiveApplicationId(applicationId).ifPresent(active -> {
+-            throw new ConflictException(ConflictException.ACTIVE_REQUEST_EXISTS,
+-                    "application " + applicationId + " already has an active request " + active.getId());
+-        });
+ 
+         PricingExceptionRequestEntity saved = requests.saveAndFlush(mapper.toNewEntity(request));
+         return new RequestView(request, saved.getVersion());
+diff --git a/src/main/java/se/ataulnasar/pricingexception/persistence/PricingExceptionRequestMapper.java b/src/main/java/se/ataulnasar/pricingexception/persistence/PricingExceptionRequestMapper.java
+index b8aed49..ffddc92 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/persistence/PricingExceptionRequestMapper.java
++++ b/src/main/java/se/ataulnasar/pricingexception/persistence/PricingExceptionRequestMapper.java
+@@ -83,7 +83,7 @@ public class PricingExceptionRequestMapper {
+         entity.setDecidedAt(request.decidedAt());
+         entity.setDecisionComment(request.decisionComment());
+         entity.setApprovedDiscountBps(request.approvedDiscount() == null ? null : request.approvedDiscount().value());
+-        entity.setActiveApplicationId(request.activeApplicationId());
++        entity.setActiveApplicationId(null);
+ 
+         for (int i = stored.size(); i < events.size(); i++) {
+             RequestEvent e = events.get(i);

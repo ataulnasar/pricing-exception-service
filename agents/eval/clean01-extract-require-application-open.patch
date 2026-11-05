@@ -1,0 +1,42 @@
+diff --git a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
+index dc165d7..a7c3a66 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
++++ b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
+@@ -58,7 +58,7 @@ public class PricingExceptionService {
+                 UUID.randomUUID(), applicationId, caller,
+                 DiscountBps.of(discountBps, properties.maxDiscountBps()), new Reason(reason), null, clock);
+ 
+-        requireOpen(loadApplication(applicationId));
++        requireApplicationOpen(applicationId);
+         requests.findByActiveApplicationId(applicationId).ifPresent(active -> {
+             throw new ConflictException(ConflictException.ACTIVE_REQUEST_EXISTS,
+                     "application " + applicationId + " already has an active request " + active.getId());
+@@ -116,7 +116,7 @@ public class PricingExceptionService {
+ 
+         if (decision == Decision.APPROVED) {
+             request.approve(caller, comment, clock);
+-            requireOpen(loadApplication(entity.getApplicationId())); // INV-06, after the domain checks
++            requireApplicationOpen(entity.getApplicationId()); // INV-06, after the domain checks
+         } else {
+             request.decline(caller, comment, clock);
+         }
+@@ -148,7 +148,7 @@ public class PricingExceptionService {
+         requireVersion(oldEntity, expectedVersion);
+         PricingExceptionRequest old = mapper.toDomain(oldEntity);
+         old.markSuperseded(caller, clock);
+-        requireOpen(loadApplication(oldEntity.getApplicationId()));
++        requireApplicationOpen(oldEntity.getApplicationId());
+         mapper.applyTo(old, oldEntity);
+         requests.saveAndFlush(oldEntity); // active_application_id is now NULL; the unique index is free
+ 
+@@ -208,6 +208,10 @@ public class PricingExceptionService {
+                 NotFoundException.APPLICATION_NOT_FOUND, "mortgage application " + applicationId + " not found"));
+     }
+ 
++    private void requireApplicationOpen(String applicationId) {
++        requireOpen(loadApplication(applicationId));
++    }
++
+     private static void requireOpen(MortgageApplicationEntity application) {
+         if (application.getStatus() != ApplicationStatus.OPEN) {
+             throw new ConflictException(ConflictException.APPLICATION_NOT_OPEN,

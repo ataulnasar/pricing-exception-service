@@ -222,6 +222,33 @@ One main test per requirement. The full list, with the deliverables and constrai
 7. **Secrets and configuration per environment.** The `postgres` profile has placeholder
    credentials (`pricing` / `pricing`).
 
+## AI review agent in CI (bonus)
+
+Every pull request gets one advisory comment, "AI review (advisory)", from `agents/review.py`. The
+script sends the diff and the rules from `agents/review-prompt.md` (the same rules as the human
+reviewer agent in `.claude/agents/reviewer.md`) to the Anthropic API, validates the answer against
+`agents/finding.schema.json`, drops every finding that does not point at a line in the diff, and
+prints markdown. The workflow is `.github/workflows/ai-review.yml`; it needs the repository secret
+`ANTHROPIC_API_KEY` and never blocks a merge. The model and limits are in `agents/config.json`.
+
+How the output is controlled and checked:
+
+- the answer is validated after the fact against the finding format; findings that do not match are
+  dropped and counted, and an answer that is not JSON at all is reported as an error, not posted as a review;
+- findings outside the diff are dropped, so the agent cannot comment on code it did not see;
+- the agent is advisory; the tests in `./mvnw verify` decide whether a change is green;
+- `agents/eval/` holds eight patches (one per invariant INV-01 to INV-06 that breaks it, plus two
+  clean refactors). `agents/eval/run.sh` applies each one, asks the agent, and runs the listed tests.
+  Live AI eval not run: it needs an Anthropic API key. The Java tests catch all 6 seeded bugs (see the table). To run it: export ANTHROPIC_API_KEY and run agents/eval/run.sh. The results file is `agents/eval/results.md`; the AI column
+  is recorded as it comes out, misses included;
+- `agents/tests/` has unit tests for the script (diff parsing, anchoring, schema, error paths); CI runs them.
+
+Remaining risks: the agent sees only the diff, not the whole code base; findings can only point at
+lines that survive in the new version, so a deleted file or line is reported through its context; a
+wrong "no findings" can reassure a reviewer; costs scale with diff size (the diff is cut at
+`max_diff_chars`); anyone who can push a same-repo branch can also edit the workflow that holds the
+secret, so the secret should live in a protected environment before wider use.
+
 ## Time spent
 
 TODO: <fill in>

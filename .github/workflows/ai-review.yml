@@ -1,0 +1,84 @@
+name: AI review
+
+# Advisory review of every pull request by agents/review.py. It never blocks a merge:
+# the step that calls the model is allowed to fail, and the comment says what happened.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# One review per pull request at a time; a new push cancels the previous run.
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Secrets are not available to pull requests from forks, and neither is the write permission.
+    # Same-repo branches are trusted: anyone who can push one can also edit this workflow file.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      BASE_REF: ${{ github.base_ref }}
+      # "true" when the repository secret exists. Without it every step below is skipped and the
+      # job ends green, so a repository without a key never gets a red check from this workflow.
+      HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      - name: Explain the skip when no key is configured
+        if: env.HAS_KEY != 'true'
+        run: echo "ANTHROPIC_API_KEY secret is not set; the AI review is skipped."
+
+      - name: Check out code
+        if: env.HAS_KEY == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Diff against the base branch
+        if: env.HAS_KEY == 'true'
+        run: git diff "origin/$BASE_REF...HEAD" > /tmp/pr.diff
+
+      # The agent script comes from the base branch, so a pull request cannot change the review
+      # logic that judges it. (The workflow file itself still comes from the PR branch.)
+      - name: Take the review agent from the base branch
+        if: env.HAS_KEY == 'true'
+        run: |
+          mkdir -p /tmp/base
+          if git archive "origin/$BASE_REF" agents 2>/dev/null | tar -x -C /tmp/base; then
+            echo "using agents/ from origin/$BASE_REF"
+          else
+            echo "origin/$BASE_REF has no agents/ directory yet; using the PR's copy"
+            cp -R agents /tmp/base/agents
+          fi
+
+      - name: Run the review agent
+        if: env.HAS_KEY == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set +e
+          python3 /tmp/base/agents/review.py --diff /tmp/pr.diff --output /tmp/review.md
+          echo "review agent exit code: $?"   # 3 = API or key problem; the markdown explains it
+          if [ ! -s /tmp/review.md ]; then
+            printf '<!-- ai-review -->\n## AI review (advisory)\n\nThe review agent did not produce output; see the workflow log.\n' > /tmp/review.md
+          fi
+
+      - name: Post or update the "AI review (advisory)" comment
+        if: env.HAS_KEY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- ai-review -->"))) | .id] | first // empty')
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F body=@/tmp/review.md > /dev/null
+            echo "updated comment $existing"
+          else
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@/tmp/review.md > /dev/null
+            echo "posted a new comment"
+          fi

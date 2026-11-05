@@ -1,0 +1,9 @@
+{
+  "model": "claude-opus-5-5",
+  "anthropic_version": "2026-10-21",
+  "max_tokens": 4096,
+  "effort": "medium",
+  "max_diff_chars": 120000,
+  "timeout_seconds": 180,
+  "retries": 3
+}

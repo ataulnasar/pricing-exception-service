@@ -1,0 +1,75 @@
+[
+  {
+    "case": "inv01-approval-stores-rounded-discount",
+    "patch": "inv01-approval-stores-rounded-discount.patch",
+    "expected": "INV-01",
+    "description": "approve() stores approvedDiscount rounded down to a 5 bps grid instead of the reviewed discount",
+    "tests": [
+      "PricingExceptionRequestTest",
+      "ReconstituteTest"
+    ]
+  },
+  {
+    "case": "inv02-withdraw-skips-event",
+    "patch": "inv02-withdraw-skips-event.patch",
+    "expected": "INV-02",
+    "description": "withdraw() sets the status directly and writes no WITHDRAWN history event",
+    "tests": [
+      "PricingExceptionRequestTest",
+      "StatusCommandMatrixTest",
+      "WithdrawalIT"
+    ]
+  },
+  {
+    "case": "inv03-decline-skips-self-review-check",
+    "patch": "inv03-decline-skips-self-review-check.patch",
+    "expected": "INV-03",
+    "description": "decline() no longer calls requireNotRequester, so a requester-reviewer can decline their own request",
+    "tests": [
+      "PricingExceptionRequestTest"
+    ]
+  },
+  {
+    "case": "inv04-no-precheck-and-no-active-slot",
+    "patch": "inv04-no-precheck-and-no-active-slot.patch",
+    "expected": "INV-04",
+    "description": "create() drops the active-request pre-check and the mapper always stores a NULL active_application_id, so the unique index protects nothing",
+    "tests": [
+      "PricingExceptionRequestRepositoryTest",
+      "ConcurrencyIT"
+    ]
+  },
+  {
+    "case": "inv05-decline-allowed-after-decision",
+    "patch": "inv05-decline-allowed-after-decision.patch",
+    "expected": "INV-05",
+    "description": "decline() only rejects WITHDRAWN and SUPERSEDED, so APPROVED and DECLINED requests can be declined again",
+    "tests": [
+      "StatusCommandMatrixTest",
+      "DomainAttackTest"
+    ]
+  },
+  {
+    "case": "inv06-approve-skips-open-check",
+    "patch": "inv06-approve-skips-open-check.patch",
+    "expected": "INV-06",
+    "description": "decide() no longer calls requireOpen for APPROVED, so a request on a closed application can be approved",
+    "tests": [
+      "WorkflowIT"
+    ]
+  },
+  {
+    "case": "clean01-extract-require-application-open",
+    "patch": "clean01-extract-require-application-open.patch",
+    "expected": "none",
+    "description": "Extracts requireApplicationOpen(applicationId) helper in the service; behaviour unchanged",
+    "tests": []
+  },
+  {
+    "case": "clean02-mapper-extract-approved-discount",
+    "patch": "clean02-mapper-extract-approved-discount.patch",
+    "expected": "none",
+    "description": "Mapper: extracts approvedDiscountOf(entity) and a storedCount local; behaviour unchanged",
+    "tests": []
+  }
+]

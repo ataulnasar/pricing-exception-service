@@ -44,8 +44,8 @@ The `Proved by` column lists the tests or documents that show each requirement i
 
 | ID | Bonus | Where | Done |
 |---|---|---|---|
-| B1 | Show how AI agents can improve the solution or the SDLC: the problem, how output is controlled and checked, remaining risks | Phase 8: CI review agent + eval | Phase 8 |
-| B2 | A simple UI to create, review and inspect requests | Phase 7 | Phase 7 |
+| B1 | Show how AI agents can improve the solution or the SDLC: the problem, how output is controlled and checked, remaining risks | Phase 8: CI review agent + eval | built; live eval not run (needs API key): `agents/review.py`, `agents/review-prompt.md`, `agents/finding.schema.json`, `.github/workflows/ai-review.yml`, `agents/eval/` (`results.md` shows the Java-test side), `agents/tests/`, README "AI review agent in CI" |
+| B2 | A simple UI to create, review and inspect requests | Phase 7 | ✅ `src/main/resources/static/` (index.html, app.js); tests StaticUiIT, UiSourceRulesTest, UiFirstLoadIT |
 
 ## Submission
 

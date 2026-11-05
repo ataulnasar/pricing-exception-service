@@ -1,0 +1,14 @@
+diff --git a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
+index 8f78613..8ecf966 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
++++ b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
+@@ -185,7 +185,8 @@ public final class PricingExceptionRequest {
+         decidedBy = reviewer.id();
+         decidedAt = now;
+         decisionComment = comment;
+-        approvedDiscount = discount;
++        // normalise to the 5 bps grid used by the pricing sheet
++        approvedDiscount = new DiscountBps((discount.value() / 5) * 5);
+         transition(RequestStatus.APPROVED, RequestEvent.Type.APPROVED, reviewer, now, comment);
+     }
+ 
