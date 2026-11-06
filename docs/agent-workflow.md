@@ -226,3 +226,65 @@ Check the current Anthropic API docs for the request format — do not guess.
 - [ ] `docs/ai-usage.md` complete — include one case where an agent was wrong and how you saw it
 - [ ] Tag: `git tag v1.0 && git push --tags`
 - [ ] Practise a 10-minute demo: decision (2 min) → live demo (4) → tests (2) → AI agents (2)
+
+---
+
+## Phase 10 — Cleanup: simpler code, same behaviour
+
+Work on the branch `cleanup`. Goal: less code that is easier to read and maintain,
+with **exactly the same behaviour**. The existing tests are the safety net.
+
+**0. Measure before** (put the numbers in the final report)
+- lines of code: `src/main`, `src/test`, `src/main/resources/static`, `agents/` (Python)
+- test count from `./mvnw verify` and from the Python tests
+- the list of test names referenced in `docs/invariants.yaml`, `docs/requirements.md` and the README
+
+**1. Production code first — do not touch any test in this step**
+```
+Simplify src/main without changing behaviour:
+- remove dead code: unused classes, methods, fields, parameters, constants, config
+- merge tiny classes or wrappers that add no meaning (only when it makes the code easier
+  to follow, not just shorter); remove needless indirection and duplicated logic
+- shorten long methods; clear names; short comments only where the "why" is not obvious
+Behaviour must stay identical: HTTP status codes, error codes, headers (ETag, Location,
+Idempotent-Replayed), JSON fields, SQL schema, check order, transactions.
+Do not edit existing Flyway migrations. Do not add dependencies.
+Run ./mvnw verify after each larger change. All tests must stay green WITHOUT changing them.
+```
+Commit → `refactor: simplify production code`
+
+**2. Tests — merge, do not lose coverage**
+```
+Use the test-writer agent:
+- merge each *AttackIT / *AttackTest into the main test class of the same topic
+- remove a test only when another test checks the same behaviour; list every removed
+  test with the test that still covers it
+- share setup helpers instead of copying them; keep test names that say the rule (INVxx_...)
+- every invariant INV-01..06 and every requirement R1..R7 keeps at least one test
+- concurrency tests stay; run them 5 times in a row
+Update test names in docs/invariants.yaml (names only), docs/requirements.md and the README table.
+```
+Commit → `test: merge overlapping tests`
+
+**3. Python and UI**
+```
+Simplify agents/review.py, agents/ask.py and src/main/resources/static/app.js without
+changing behaviour. Merge agents/tests/test_review_attack.py into test_review.py the same
+way as step 2. All Python and UI tests stay green.
+```
+Commit → `refactor: simplify review agent, project guide and UI`
+
+**4. Review and docs**
+- Use the **reviewer** agent on the whole branch diff (`git diff main...cleanup`). Check:
+  behaviour unchanged, no rule lost a test, nothing removed that the docs still mention.
+- Update class names in `docs/diagrams/architecture.md`, `docs/how-to-change.md`,
+  `docs/design.md` if they changed. Add one line to `docs/ai-usage.md`.
+- Commit → `docs: update after cleanup`
+
+**5. Pull request** — push the branch and open a PR to `main` with a before/after table
+(lines and test counts), the list of removed tests and their replacements, and CI green.
+
+**Stop and ask me** if a simplification would change behaviour, an API, the schema, or a business rule.
+
+**Done when:** CI is green on the PR, every INV and R row still has a test, and I have
+done one manual click-through of the UI on the branch.
