@@ -1,5 +1,5 @@
 diff --git a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
-index dc165d7..a7c3a66 100644
+index 0be7ec6..2ac9fad 100644
 --- a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
 +++ b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
 @@ -58,7 +58,7 @@ public class PricingExceptionService {
@@ -9,9 +9,9 @@ index dc165d7..a7c3a66 100644
 -        requireOpen(loadApplication(applicationId));
 +        requireApplicationOpen(applicationId);
          requests.findByActiveApplicationId(applicationId).ifPresent(active -> {
-             throw new ConflictException(ConflictException.ACTIVE_REQUEST_EXISTS,
-                     "application " + applicationId + " already has an active request " + active.getId());
-@@ -116,7 +116,7 @@ public class PricingExceptionService {
+             throw ApiProblem.activeRequestExists(applicationId, active.getId());
+         });
+@@ -115,7 +115,7 @@ public class PricingExceptionService {
  
          if (decision == Decision.APPROVED) {
              request.approve(caller, comment, clock);
@@ -20,7 +20,7 @@ index dc165d7..a7c3a66 100644
          } else {
              request.decline(caller, comment, clock);
          }
-@@ -148,7 +148,7 @@ public class PricingExceptionService {
+@@ -147,7 +147,7 @@ public class PricingExceptionService {
          requireVersion(oldEntity, expectedVersion);
          PricingExceptionRequest old = mapper.toDomain(oldEntity);
          old.markSuperseded(caller, clock);
@@ -29,8 +29,8 @@ index dc165d7..a7c3a66 100644
          mapper.applyTo(old, oldEntity);
          requests.saveAndFlush(oldEntity); // active_application_id is now NULL; the unique index is free
  
-@@ -208,6 +208,10 @@ public class PricingExceptionService {
-                 NotFoundException.APPLICATION_NOT_FOUND, "mortgage application " + applicationId + " not found"));
+@@ -204,6 +204,10 @@ public class PricingExceptionService {
+         return applications.findById(applicationId).orElseThrow(() -> ApiProblem.applicationNotFound(applicationId));
      }
  
 +    private void requireApplicationOpen(String applicationId) {
@@ -39,4 +39,4 @@ index dc165d7..a7c3a66 100644
 +
      private static void requireOpen(MortgageApplicationEntity application) {
          if (application.getStatus() != ApplicationStatus.OPEN) {
-             throw new ConflictException(ConflictException.APPLICATION_NOT_OPEN,
+             throw ApiProblem.applicationNotOpen(application.getId(), application.getStatus());

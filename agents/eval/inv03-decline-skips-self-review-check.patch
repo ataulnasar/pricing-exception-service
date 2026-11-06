@@ -1,12 +1,12 @@
 diff --git a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-index 8f78613..73c4f58 100644
+index 39a64a1..9088973 100644
 --- a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
 +++ b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-@@ -195,7 +195,6 @@ public final class PricingExceptionRequest {
+@@ -189,7 +189,6 @@ public final class PricingExceptionRequest {
          Objects.requireNonNull(clock, "clock");
          requirePending("decline");
          requireRole(reviewer, Role.REVIEWER, "decline");
 -        requireNotRequester(reviewer);
          validateComment(comment);
- 
-         Instant now = clock.instant();
+         decide(RequestStatus.DECLINED, RequestEvent.Type.DECLINED, reviewer, comment, clock);
+     }
