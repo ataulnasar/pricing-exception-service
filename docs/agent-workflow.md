@@ -347,3 +347,68 @@ table to the PR description. Do not merge.
 
 **Done when:** CI is green on the PR, the targets are reached (or the report explains
 why a part could not shrink safely), and I have done one manual UI click-through.
+
+---
+
+## Phase 12 — Switch to classic Spring MVC (branch `mvc`)
+
+Decision: the owner builds Spring MVC apps day to day and must defend this code in an
+interview, so the code moves to the classic MVC structure he knows. Record it as
+**ADR-007** (context, decision, consequences; ADR-006 and older stay as history).
+
+**Target packages** (`se.ataulnasar.pricingexception`):
+`controller` (@RestController) · `service` (@Service, all business rules, @Transactional,
+idempotency) · `repository` (Spring Data JPA) · `model` (@Entity classes and enums) ·
+`dto` (request/response records) · `exception` (ApiProblem + error handler) · `config`.
+The `domain` package, the entity↔domain mapper and `reconstitute()` are removed.
+
+**Must not change:** URLs, HTTP status codes, error codes, headers (ETag, Location,
+Idempotent-Replayed, If-Match rules), JSON fields, Flyway schema (no edits to existing
+migrations), the check order (status → role → self-review → limit → comment), one event
+per status change in the same transaction, idempotency and optimistic locking. No new
+dependency. Stop and ask before any behaviour change.
+
+**0. Measure before** — lines and test counts; list the API/IT test classes. These are the
+safety net and are NOT edited in step 1.
+
+**1. Restructure the production code**
+```
+Move to the target packages. Put every business rule from domain/PricingExceptionRequest
+into PricingExceptionService (or small private helper methods in it), keeping the same
+check order and the same error codes and messages. Work directly on the JPA entities.
+Value checks (discount 1..max, reason, comment length) keep their codes
+(INVALID_DISCOUNT, INVALID_REASON, INVALID_COMMENT) and HTTP status.
+Delete the domain package, the mapper and reconstitute(). Keep the injected Clock.
+The api-level tests (*IT, controller tests, UI tests) must pass WITHOUT edits.
+Domain unit tests will not compile: move them to step 2, do not delete them yet.
+```
+Commit → `refactor: move to classic Spring MVC structure`
+
+**2. Tests**
+```
+Use the test-writer agent: turn the old domain tests (status x command matrix, INV-01,
+INV-03, INV-05, value checks) into service tests (plain JUnit + Mockito for the
+repositories, fixed Clock) or @DataJpaTest where the database matters. Keep EVERY case
+and keep the INVxx_ test names. Remove tests only for code that no longer exists
+(mapper, reconstitute) and list them. Update ArchUnit rules for the new packages:
+controllers never use repositories, no Instant.now(), no field injection.
+Run the concurrency tests 5 times.
+```
+Commit → `test: service-level rule tests for MVC structure`
+
+**3. Docs, agents and eval**
+```
+Update: ADR-007 (new), docs/design.md, docs/diagrams/architecture.md, docs/how-to-change.md,
+CLAUDE.md (package rules), docs/invariants.yaml and docs/requirements.md (test names only),
+README, agents/project-guide-prompt.md if it names packages, and regenerate the
+agents/eval patches so each still breaks its invariant (CI checks they apply).
+Add one line to docs/ai-usage.md.
+```
+Commit → `docs: update for MVC structure`
+
+**4. Review and PR** — reviewer agent on `git diff main...mvc` (behaviour unchanged, every
+INV-01..06 and R1..R7 still tested, no doc names a removed class). Push, open a PR with a
+before/after table and the old→new test mapping. Do not merge.
+
+**Done when:** CI green on the PR, all ITs passed unedited, and I have done one manual
+UI click-through on the branch.
