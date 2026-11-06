@@ -321,10 +321,10 @@ class CallApiAttackTest(unittest.TestCase):
         with mock.patch.object(review.urllib.request, "urlopen", side_effect=self.http_error(401)) as op, \
                 mock.patch.object(review.time, "sleep") as sleep:
             with self.assertRaises(review.ApiError) as ctx:
-                review.call_api(REAL_CONFIG, {}, "sk-ant-SECRET")
+                review.call_api(REAL_CONFIG, {}, "fake-test-key-not-real")
         self.assertEqual(op.call_count, 1)
         sleep.assert_not_called()
-        self.assertNotIn("SECRET", str(ctx.exception))
+        self.assertNotIn("fake-test-key-not-real", str(ctx.exception))
 
     def test_429_then_success_retries_with_backoff_and_503_forever_gives_up(self):
         with mock.patch.object(review.urllib.request, "urlopen", side_effect=[self.http_error(429), self.Ok()]), \

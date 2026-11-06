@@ -108,7 +108,7 @@ The codes, grouped by HTTP status:
 `PostgresMigrationTest` runs the Flyway migrations and the seed data against a real
 PostgreSQL 17 in Docker (Testcontainers). It is annotated
 `@Testcontainers(disabledWithoutDocker = true)`, so without a reachable Docker daemon it is
-**skipped**, and `./mvnw verify` prints `Skipped: 2` for it. In GitHub CI the workflow fails if
+**skipped**, and `./mvnw verify` reports both Postgres classes (`PostgresMigrationTest`, `PostgresApiIT`) as skipped. In GitHub CI the workflow fails if
 that happens, so a skip can never pass unnoticed there.
 
 ### Docker Desktop

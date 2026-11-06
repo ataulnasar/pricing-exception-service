@@ -18,18 +18,18 @@ The `Proved by` column lists the tests or documents that show each requirement i
 
 | ID | Requirement | Our decision | Proved by |
 |---|---|---|---|
-| R7 | One stakeholder wants RMs to change the discount after submit. Another wants an approval to always apply to the exact request that was reviewed. Make and explain a decision. | Requests never change (INV-01). The RM supersedes a PENDING request instead. Explained in ADR-001 and the README. | PricingExceptionRequestTest.INV01_approval_records_reviewed_discount; PricingExceptionRequestTest.INV01_request_has_no_way_to_change_the_discount; SupersedeIT.INV01_only_pending_request_can_be_superseded; SupersedeIT.INV01_no_endpoint_changes_discount_after_approval; docs/design.md "Key decisions" 1 (ADR-001 and README: Phase 6) |
+| R7 | One stakeholder wants RMs to change the discount after submit. Another wants an approval to always apply to the exact request that was reviewed. Make and explain a decision. | Requests never change (INV-01). The RM supersedes a PENDING request instead. Explained in ADR-001 and the README. | PricingExceptionRequestTest.INV01_approval_records_reviewed_discount; PricingExceptionRequestTest.INV01_request_has_no_way_to_change_the_discount; SupersedeIT.INV01_only_pending_request_can_be_superseded; SupersedeIT.INV01_no_endpoint_changes_discount_after_approval; docs/design.md "Key decisions" 1; `docs/adr/ADR-001.md`; README "The stakeholder decision" |
 
 ## Deliverables
 
 | ID | Deliverable | Where | Done |
 |---|---|---|---|
 | D1 | Working, runnable solution; HTTP API expected | the app | ✅ `./mvnw spring-boot:run`; HTTP API in docs/design.md; CI green on every push |
-| D2 | Seed data or setup steps to try a realistic workflow | seed migration, `http/requests.http`, `scripts/demo.sh` | ✅ seed: `src/main/resources/db/seed/V1000__local_seed_data.sql`; walkthrough: `http/requests.http`; `scripts/demo.sh`: Phase 6 |
-| D3 | Source in Git, with instructions to run, test and explore | GitHub repo, README | ✅ github.com/ataulnasar/pricing-exception-service; run/test steps in `docs/runbook.md`; full README: Phase 6 |
-| D4 | Short README: the problem, assumptions, scope choices | `README.md` | Phase 6 (docs-writer) |
-| D5 | Evidence that important behaviour is tested | test suite, README "requirement → test" table | ✅ 476 tests in `./mvnw verify` incl. Postgres; this file; README table: Phase 6 |
-| D6 | Decisions, diagrams, notes and operational guidance for the next engineer | `docs/adr/`, `docs/diagrams/`, `docs/runbook.md` | partly: `docs/design.md`, `docs/invariants.yaml`, `docs/runbook.md`; ADRs and diagrams: Phase 6 |
+| D2 | Seed data or setup steps to try a realistic workflow | seed migration, `http/requests.http`, `scripts/demo.sh` | ✅ seed: `src/main/resources/db/seed/V1000__local_seed_data.sql`; walkthrough: `http/requests.http`; full scenario: `scripts/demo.sh` |
+| D3 | Source in Git, with instructions to run, test and explore | GitHub repo, README | ✅ github.com/ataulnasar/pricing-exception-service; `README.md` quick start; `docs/runbook.md` |
+| D4 | Short README: the problem, assumptions, scope choices | `README.md` | ✅ `README.md` |
+| D5 | Evidence that important behaviour is tested | test suite, README "requirement → test" table | ✅ 489 tests in `./mvnw verify` incl. Postgres (CI); 58 Python tests (review agent and project guide); this file; README "Requirement → test" |
+| D6 | Decisions, diagrams, notes and operational guidance for the next engineer | `docs/adr/`, `docs/diagrams/`, `docs/runbook.md` | ✅ `docs/adr/ADR-001..006`, `docs/diagrams/` (state machine, architecture, development flow), `docs/runbook.md`, `docs/design.md`, `docs/invariants.yaml` |
 
 ## Constraints
 
@@ -37,8 +37,8 @@ The `Proved by` column lists the tests or documents that show each requirement i
 |---|---|---|---|
 | C1 | Any language and tools; Java or C# preferred | Java 21, Spring Boot 4 | ✅ |
 | C2 | Easy to run locally; no private infrastructure or paid services | H2 by default; Postgres optional via Docker | ✅ H2 in memory by default; Postgres only via Testcontainers / `postgres` profile (`docs/runbook.md`) |
-| C3 | Say what must change before production where we took a lighter path | README "Before production" section | Phase 6 (README "Before production") |
-| C4 | Use agentic development where it adds value; be ready to explain how agents helped and how output was checked | `.claude/agents/`, `docs/agent-workflow.md`, `docs/ai-usage.md` | ✅ `.claude/agents/`, `.claude/commands/run-phase.md`, `docs/agent-workflow.md`, `docs/ai-usage.md` (one line per phase) |
+| C3 | Say what must change before production where we took a lighter path | README "Before production" section | ✅ README "Before production" (7 items) |
+| C4 | Use agentic development where it adds value; be ready to explain how agents helped and how output was checked | `.claude/agents/`, `docs/agent-workflow.md`, `docs/ai-usage.md` | ✅ `.claude/agents/`, `.claude/commands/run-phase.md`, `docs/agent-workflow.md`, `docs/ai-usage.md` (one line per phase), `.claude/agents/project-guide.md` (/ask), `agents/ask.py` |
 
 ## Bonus
 

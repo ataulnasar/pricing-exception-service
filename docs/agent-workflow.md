@@ -171,7 +171,7 @@ so the unique index does not fail. Add both to http/requests.http.
 Use the docs-writer agent. Write:
 - README.md: problem, quick start (3 commands), demo walkthrough, assumptions, the
   stakeholder decision (supersede instead of edit), scope choices, a table
-  "requirement -> test", "before production" list, time spent (TODO for me), AI usage link.
+  "requirement -> test", "before production" list, time spent (done), AI usage link.
 - docs/adr/ADR-001 to ADR-006 from docs/design.md "Key decisions".
 - docs/diagrams/state-machine.md (Mermaid).
 - docs/runbook.md: config, health endpoint, error codes, reset local DB.
