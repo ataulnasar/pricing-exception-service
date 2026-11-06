@@ -323,7 +323,7 @@ class WorkflowIT {
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     }
 
-    // JUDGEMENT: design says "unknown X-User-Id -> 401"; the resolver trims, so " rm-anna " is accepted as rm-anna.
+    // JUDGEMENT: design says "unknown X-User-Id -> 401"; the resolver does not trim, so " rm-anna " is unknown.
     @Test
     void api_user_id_with_surrounding_whitespace_is_not_a_known_user_JUDGEMENT() throws Exception {
         mvc.perform(get(BASE).header("X-User-Id", " rm-anna ")).andExpect(status().isUnauthorized());
