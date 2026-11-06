@@ -1,5 +1,6 @@
 package se.ataulnasar.pricingexception;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 
@@ -11,10 +12,18 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RestController;
 
-/** CLAUDE.md code-style and layering rules for the whole main code. */
+/** CLAUDE.md code-style and layering rules for the classic MVC layout (ADR-007). */
 @AnalyzeClasses(packages = "se.ataulnasar.pricingexception", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureRulesTest {
+
+    private static final String CONTROLLER = "se.ataulnasar.pricingexception.controller..";
+    private static final String SERVICE = "se.ataulnasar.pricingexception.service..";
+    private static final String REPOSITORY = "se.ataulnasar.pricingexception.repository..";
+    private static final String MODEL = "se.ataulnasar.pricingexception.model..";
+    private static final String DTO = "se.ataulnasar.pricingexception.dto..";
 
     @ArchTest
     static final ArchRule time_comes_from_the_clock_not_from_now = noClasses()
@@ -24,10 +33,34 @@ class ArchitectureRulesTest {
             .because("time comes from an injected Clock (CLAUDE.md)");
 
     @ArchTest
-    static final ArchRule controllers_do_not_depend_on_persistence = noClasses()
-            .that().resideInAPackage("se.ataulnasar.pricingexception.api..")
-            .should().dependOnClassesThat().resideInAPackage("se.ataulnasar.pricingexception.persistence..")
+    static final ArchRule controllers_do_not_depend_on_repositories = noClasses()
+            .that().resideInAPackage(CONTROLLER)
+            .should().dependOnClassesThat().resideInAPackage(REPOSITORY)
             .because("controllers call services, never repositories (CLAUDE.md)");
+
+    @ArchTest
+    static final ArchRule controllers_live_in_the_controller_package = classes()
+            .that().areAnnotatedWith(RestController.class)
+            .should().resideInAPackage(CONTROLLER)
+            .because("the MVC layout puts every @RestController in controller (ADR-007)");
+
+    @ArchTest
+    static final ArchRule services_live_in_the_service_package = classes()
+            .that().areAnnotatedWith(Service.class)
+            .should().resideInAPackage(SERVICE)
+            .because("the MVC layout puts every @Service in service (ADR-007)");
+
+    @ArchTest
+    static final ArchRule dependencies_point_from_controller_to_service_to_repository = noClasses()
+            .that().resideInAnyPackage(SERVICE, REPOSITORY, MODEL, DTO)
+            .should().dependOnClassesThat().resideInAPackage(CONTROLLER)
+            .because("nothing below the controllers depends on them (ADR-007)");
+
+    @ArchTest
+    static final ArchRule repositories_and_entities_do_not_depend_on_services = noClasses()
+            .that().resideInAnyPackage(REPOSITORY, MODEL)
+            .should().dependOnClassesThat().resideInAnyPackage(SERVICE, DTO)
+            .because("repositories and entities are the bottom layer (ADR-007)");
 
     @ArchTest
     static final ArchRule no_field_injection = noFields()
