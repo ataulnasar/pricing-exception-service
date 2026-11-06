@@ -1,9 +1,14 @@
 package se.ataulnasar.pricingexception.domain;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /** Shared test data. Fixed clock, seed-data users from docs/design.md. */
 final class Fixtures {
@@ -46,5 +51,21 @@ final class Fixtures {
             case SUPERSEDED -> r.markSuperseded(ANNA, CLOCK);
         }
         return r;
+    }
+
+    /** Everything a command may change, to prove a rejected command changed nothing. */
+    record Snapshot(RequestStatus status, List<RequestEvent> events, String decidedBy, Instant decidedAt, String comment,
+                    DiscountBps approved, String active) {
+        static Snapshot of(PricingExceptionRequest r) {
+            return new Snapshot(r.status(), List.copyOf(r.events()), r.decidedBy(), r.decidedAt(), r.decisionComment(),
+                    r.approvedDiscount(), r.activeApplicationId());
+        }
+    }
+
+    /** The command is rejected with the given domain error code and the request is left exactly as it was. */
+    static void assertRejectedAndUntouched(PricingExceptionRequest r, Consumer<PricingExceptionRequest> cmd, String code) {
+        Snapshot before = Snapshot.of(r);
+        assertThatThrownBy(() -> cmd.accept(r)).isInstanceOfSatisfying(DomainException.class, e -> assertThat(e.code()).isEqualTo(code));
+        assertThat(Snapshot.of(r)).isEqualTo(before);
     }
 }

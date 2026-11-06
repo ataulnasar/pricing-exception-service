@@ -42,10 +42,6 @@ class StatusCommandMatrixTest {
                 Stream.of(Command.values()).map(c -> Arguments.of(s, c)));
     }
 
-    static Stream<Arguments> nonPendingStatusAndCommand() {
-        return allStatusAndCommand().filter(a -> a.get()[0] != RequestStatus.PENDING);
-    }
-
     @ParameterizedTest(name = "INV05_transition_table: {0} x {1}")
     @MethodSource("allStatusAndCommand")
     void INV05_transition_table(RequestStatus from, Command cmd) {
@@ -59,34 +55,11 @@ class StatusCommandMatrixTest {
             assertThat(r.events().get(eventsBefore).fromStatus()).isEqualTo(from);
             assertThat(r.events().get(eventsBefore).toStatus()).isEqualTo(cmd.target);
         } else {
-            String activeBefore = r.activeApplicationId();
-            assertThatThrownBy(() -> cmd.run(r))
-                    .isInstanceOf(InvalidTransitionException.class)
-                    .extracting("code").isEqualTo("INVALID_TRANSITION");
-            assertThat(r.status()).isEqualTo(from);                 // unchanged
-            assertThat(r.events()).hasSize(eventsBefore);           // no event on failure
-            assertThat(r.activeApplicationId()).isEqualTo(activeBefore);
+            assertRejectedAndUntouched(r, cmd::run, "INVALID_TRANSITION"); // status, events, decision fields, active id all unchanged
+            // and again: still final after the failed attempt
+            assertThatThrownBy(() -> cmd.run(r)).isInstanceOf(InvalidTransitionException.class);
+            assertThat(r.status()).isEqualTo(from);
         }
-    }
-
-    @ParameterizedTest(name = "INV05_final_status_stays_final: {0} x {1}")
-    @MethodSource("nonPendingStatusAndCommand")
-    void INV05_final_status_stays_final(RequestStatus from, Command cmd) {
-        PricingExceptionRequest r = inStatus(from);
-        assertThatThrownBy(() -> cmd.run(r)).isInstanceOf(InvalidTransitionException.class);
-        // and again: still final after the failed attempt
-        assertThatThrownBy(() -> cmd.run(r)).isInstanceOf(InvalidTransitionException.class);
-        assertThat(r.status()).isEqualTo(from);
-    }
-
-    @ParameterizedTest(name = "INV05_approved_request_cannot_be_decided_again_by_other_reviewer: {0}")
-    @EnumSource(value = RequestStatus.class, names = "PENDING", mode = EnumSource.Mode.EXCLUDE)
-    void INV05_second_decision_is_rejected(RequestStatus from) {
-        PricingExceptionRequest r = inStatus(from);
-        assertThatThrownBy(() -> r.approve(SARA, null, CLOCK))
-                .isInstanceOf(InvalidTransitionException.class);
-        assertThatThrownBy(() -> r.decline(JOHAN, null, CLOCK))
-                .isInstanceOf(InvalidTransitionException.class);
     }
 
     static final Map<RequestStatus, Boolean> ACTIVE = Map.of(
@@ -98,10 +71,6 @@ class StatusCommandMatrixTest {
     @EnumSource(RequestStatus.class)
     void activeApplicationId_is_set_only_while_pending_or_approved(RequestStatus status) {
         PricingExceptionRequest r = inStatus(status);
-        if (ACTIVE.get(status)) {
-            assertThat(r.activeApplicationId()).isEqualTo(APPLICATION_ID);
-        } else {
-            assertThat(r.activeApplicationId()).isNull();
-        }
+        assertThat(r.activeApplicationId()).isEqualTo(ACTIVE.get(status) ? APPLICATION_ID : null);
     }
 }
