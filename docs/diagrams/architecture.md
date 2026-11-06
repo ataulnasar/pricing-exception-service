@@ -37,6 +37,7 @@ flowchart TB
         svc["PricingExceptionService<br/>(one transaction per command)"]
         idem["IdempotencyService<br/>IdempotencyPurge"]
         ref["ReferenceDataService, UserLookup"]
+        err["ApiProblem<br/>(one status + code error type)"]
     end
     subgraph domain["domain (plain Java)"]
         agg["PricingExceptionRequest<br/>(all business rules)"]
