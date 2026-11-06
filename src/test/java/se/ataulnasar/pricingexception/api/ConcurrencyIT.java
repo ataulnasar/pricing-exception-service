@@ -39,6 +39,8 @@ import se.ataulnasar.pricingexception.persistence.IdempotencyRecordRepository;
 class ConcurrencyIT {
 
     private static final int PARALLEL = 10;
+    /** Contenders in the decision race: the same count the original attack test used. */
+    private static final int DECISION_CONTENDERS = 8;
 
     @LocalServerPort int port;
     @Autowired JdbcTemplate jdbc;
@@ -122,28 +124,35 @@ class ConcurrencyIT {
         }
     }
 
-    /** Creates a 40 bps request (within both reviewers' limits) and decides it twice at once with If-Match "0". */
+    /**
+     * Creates a 40 bps request (within both reviewers' limits) and decides it {@link #DECISION_CONTENDERS}
+     * times at once with If-Match "0": approvals by rev-johan and declines by rev-sara, alternating.
+     */
     private record Race(String location, List<Resp> results) {}
 
-    private Race raceTwoDecisions() throws Exception {
+    private Race raceDecisions() throws Exception {
         String location = create("rm-anna", createBody(newApp(), 40), null).status(201).location();
         AtomicInteger n = new AtomicInteger();
-        List<Resp> results = parallel(2, () -> n.getAndIncrement() == 0
+        List<Resp> results = parallel(DECISION_CONTENDERS, () -> n.getAndIncrement() % 2 == 0
                 ? api.decide(location, "rev-johan", "APPROVED", q(0))
                 : api.decide(location, "rev-sara", "DECLINED", q(0)));
         return new Race(location, results);
     }
 
+    /** Exactly one 200; every other contender lost with 409 or 412 and a stable code. */
     private static void assertExactlyOneWinner(List<Resp> results) {
-        Resp loser = losers(results, 200).get(0);
-        assertRaceLoser(loser);
-        assertThat(loser.str("$.code")).isIn("CONCURRENT_MODIFICATION", "INVALID_TRANSITION", "VERSION_MISMATCH");
+        List<Resp> losers = losers(results, 200);
+        assertThat(losers).hasSize(DECISION_CONTENDERS - 1);
+        for (Resp loser : losers) {
+            assertRaceLoser(loser);
+            assertThat(loser.str("$.code")).isIn("CONCURRENT_MODIFICATION", "INVALID_TRANSITION", "VERSION_MISMATCH");
+        }
     }
 
     @Test
     void INV05_two_parallel_decisions_only_one_wins() throws Exception {
         for (int round = 0; round < 5; round++) {
-            Race race = raceTwoDecisions();
+            Race race = raceDecisions();
             assertExactlyOneWinner(race.results());
             Resp after = api.get("rm-anna", race.location());
             assertThat(after.str("$.status")).isIn("APPROVED", "DECLINED");
@@ -154,7 +163,7 @@ class ConcurrencyIT {
     @Test
     void INV02_losing_decision_writes_no_event() throws Exception {
         for (int round = 0; round < 5; round++) {
-            Race race = raceTwoDecisions();
+            Race race = raceDecisions();
             assertExactlyOneWinner(race.results());
             Resp after = api.get("rm-anna", race.location());
             after.has("$.version", 1);
