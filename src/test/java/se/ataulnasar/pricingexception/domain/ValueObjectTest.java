@@ -2,7 +2,11 @@ package se.ataulnasar.pricingexception.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static se.ataulnasar.pricingexception.domain.Fixtures.*;
 
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -147,4 +151,59 @@ class ValueObjectTest {
         return org.junit.jupiter.api.Assertions.assertThrows(InvalidTransitionException.class,
                 () -> Fixtures.inStatus(RequestStatus.DECLINED).withdraw(Fixtures.ANNA, Fixtures.CLOCK));
     }
+
+    // --- edge cases (merged from DomainAttackTest) ---
+
+    @Test
+    void discount_of_rejects_max_plus_one_and_accepts_max_and_one() {
+        assertThat(DiscountBps.of(100, 100).value()).isEqualTo(100);
+        assertThat(DiscountBps.of(1, 100).value()).isEqualTo(1);
+        assertThatThrownBy(() -> DiscountBps.of(101, 100)).isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> DiscountBps.of(0, 100)).isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> DiscountBps.of(Integer.MIN_VALUE, 100)).isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void discount_of_with_max_below_one_accepts_nothing() {
+        assertThatThrownBy(() -> DiscountBps.of(1, 0))
+                .isInstanceOfSatisfying(ValidationException.class, e -> assertThat(e.code()).isEqualTo("INVALID_DISCOUNT"));
+    }
+
+    @Test
+    void reason_of_500_whitespace_padded_chars_with_text_is_accepted_and_501_rejected() {
+        assertThat(new Reason("a" + " ".repeat(499)).value()).hasSize(500);
+        assertThatThrownBy(() -> new Reason("a" + " ".repeat(500)))
+                .isInstanceOfSatisfying(ValidationException.class, e -> assertThat(e.code()).isEqualTo("INVALID_REASON"));
+    }
+
+    @Test
+    void reason_of_only_unicode_whitespace_is_blank() {
+        // ideographic space, em space, line separator
+        assertThatThrownBy(() -> new Reason("　  ")).isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void reason_of_only_non_breaking_space_is_blank() {
+        // JUDGEMENT: design says "not blank"; String.isBlank() treats NBSP / zero-width space as text.
+        assertThatThrownBy(() -> new Reason("  ")).isInstanceOf(ValidationException.class);
+    }
+
+    // Length limits count UTF-16 units (String.length()), same as @Size and never more than the DB column.
+    // A 500-code-point emoji reason is therefore rejected by design.
+
+    @Test
+    void discount_value_objects_from_both_constructors_are_equal() {
+        assertThat(DiscountBps.of(40, 100)).isEqualTo(new DiscountBps(40)).hasSameHashCodeAs(new DiscountBps(40));
+    }
+
+    @Test
+    void actor_same_id_different_role_is_not_equal() {
+        assertThat(Actor.rm("x")).isNotEqualTo(Actor.mortgageProcess("x"));
+    }
+
+    @Test
+    void actor_rejects_whitespace_only_id() {
+        assertThatThrownBy(() -> Actor.rm(" \t")).isInstanceOf(IllegalArgumentException.class);
+    }
+
 }

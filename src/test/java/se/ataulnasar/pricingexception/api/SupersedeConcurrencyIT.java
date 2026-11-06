@@ -10,6 +10,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -17,6 +18,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -112,13 +114,19 @@ class SupersedeConcurrencyIT {
 
     /** Runs the task n times at the same moment (latch) and returns all results in submit order. */
     private static <T> List<T> parallel(int n, Callable<T> task) throws Exception {
+        return parallel(Collections.nCopies(n, task));
+    }
+
+    /** Task i runs as tasks.get(i); results come back in the same order. */
+    private static <T> List<T> parallel(List<Callable<T>> tasks) throws Exception {
+        int n = tasks.size();
         ExecutorService pool = Executors.newFixedThreadPool(n);
         try {
             CountDownLatch ready = new CountDownLatch(n);
             CountDownLatch go = new CountDownLatch(1);
-            List<Future<T>> futures = new ArrayList<>();
-            for (int i = 0; i < n; i++) {
-                futures.add(pool.submit(() -> {
+            List<Future<T>> fs = new ArrayList<>();
+            for (Callable<T> task : tasks) {
+                fs.add(pool.submit(() -> {
                     ready.countDown();
                     go.await();
                     return task.call();
@@ -127,7 +135,7 @@ class SupersedeConcurrencyIT {
             ready.await();
             go.countDown();
             List<T> out = new ArrayList<>();
-            for (Future<T> f : futures) out.add(f.get(60, java.util.concurrent.TimeUnit.SECONDS));
+            for (Future<T> f : fs) out.add(f.get(60, TimeUnit.SECONDS));
             return out;
         } finally {
             pool.shutdownNow();
@@ -216,5 +224,72 @@ class SupersedeConcurrencyIT {
         Resp old = get(location);
         assertThat(old.json("$.status")).isEqualTo("SUPERSEDED");
         assertThat(JsonPath.<Integer>read(old.body(), "$.events.length()")).isEqualTo(2);
+    }
+
+    // ---------- supersede racing with withdraw, create and reads (merged from SupersedeRaceAttackIT) ----------
+
+    private static final String SUP = "{\"discountBps\":30,\"reason\":\"Lower discount after review\"}";
+
+    private List<String> statusesOf(String app) throws Exception {
+        Resp list = send("GET", "/api/pricing-exceptions?applicationId=" + app, "rm-anna", null);
+        return JsonPath.read(list.body(), "$[*].status");
+    }
+
+    @Test
+    void INV05_supersede_racing_with_withdraw_only_one_wins() throws Exception {
+        for (int round = 0; round < 8; round++) {
+            String app = newApp();
+            Resp created = send("POST", "/api/pricing-exceptions", "rm-anna", createBody(app, 40));
+            String id = created.json("$.id");
+            List<Resp> rs = parallel(List.<Callable<Resp>>of(
+                    () -> send("POST", "/api/pricing-exceptions/" + id + "/supersessions", "rm-anna", SUP, "If-Match", "\"0\""),
+                    () -> send("POST", "/api/pricing-exceptions/" + id + "/withdrawal", "rm-anna", null, "If-Match", "\"0\"")));
+            assertThat(rs.stream().filter(r -> r.status() == 200 || r.status() == 201)).as(rs.toString()).hasSize(1);
+            Resp loser = rs.stream().filter(r -> r.status() != 200 && r.status() != 201).findFirst().orElseThrow();
+            assertThat(loser.status()).as(loser.body()).isIn(409, 412);
+            List<String> st = statusesOf(app);
+            long active = st.stream().filter(s -> s.equals("PENDING") || s.equals("APPROVED")).count();
+            if (rs.get(0).status() == 201) {
+                assertThat(st).containsExactlyInAnyOrder("SUPERSEDED", "PENDING");
+            } else {
+                assertThat(st).containsExactly("WITHDRAWN");
+                assertThat(active).isZero();
+            }
+            Resp old = send("GET", "/api/pricing-exceptions/" + id, "rm-anna", null);
+            assertThat(JsonPath.<Integer>read(old.body(), "$.events.length()")).isEqualTo(2);
+        }
+    }
+
+    @Test
+    void INV04_create_racing_with_supersede_is_always_409_and_never_a_second_active_request() throws Exception {
+        for (int round = 0; round < 10; round++) {
+            String app = newApp();
+            String id = send("POST", "/api/pricing-exceptions", "rm-anna", createBody(app, 40)).json("$.id");
+            List<Resp> rs = parallel(List.<Callable<Resp>>of(
+                    () -> send("POST", "/api/pricing-exceptions/" + id + "/supersessions", "rm-anna", SUP, "If-Match", "\"0\""),
+                    () -> send("POST", "/api/pricing-exceptions", "rm-anna", createBody(app, 20))));
+            Resp sup = rs.get(0), create = rs.get(1);
+            assertThat(sup.status()).as(sup.body()).isEqualTo(201);
+            assertThat(create.status()).as(create.body()).isEqualTo(409);
+            assertThat(create.json("$.code")).isEqualTo("ACTIVE_REQUEST_EXISTS");
+            assertThat(statusesOf(app)).containsExactlyInAnyOrder("SUPERSEDED", "PENDING");
+        }
+    }
+
+    @Test
+    void approved_discount_reads_during_a_supersede_are_404_NO_APPROVED_DISCOUNT() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            String app = newApp();
+            String id = send("POST", "/api/pricing-exceptions", "rm-anna", createBody(app, 40)).json("$.id");
+            List<Resp> rs = parallel(List.<Callable<Resp>>of(
+                    () -> send("POST", "/api/pricing-exceptions/" + id + "/supersessions", "rm-anna", SUP, "If-Match", "\"0\""),
+                    () -> send("GET", "/api/applications/" + app + "/approved-discount", "mortgage-system", null),
+                    () -> send("GET", "/api/applications/" + app + "/approved-discount", "mortgage-system", null)));
+            assertThat(rs.get(0).status()).isEqualTo(201);
+            for (Resp r : rs.subList(1, 3)) {
+                assertThat(r.status()).as(r.body()).isEqualTo(404);
+                assertThat(r.json("$.code")).isEqualTo("NO_APPROVED_DISCOUNT");
+            }
+        }
     }
 }

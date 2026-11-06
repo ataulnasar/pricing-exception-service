@@ -46,7 +46,7 @@
     "description": "decline() only rejects WITHDRAWN and SUPERSEDED, so APPROVED and DECLINED requests can be declined again",
     "tests": [
       "StatusCommandMatrixTest",
-      "DomainAttackTest"
+      "PricingExceptionRequestTest"
     ]
   },
   {

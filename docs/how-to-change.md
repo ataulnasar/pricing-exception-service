@@ -38,7 +38,7 @@ Read this before you change anything. The project guide (`/ask` in Claude Code, 
 
 ### Change a limit or a value (e.g. max discount from 100 to 150 bps)
 1. Check whether a rule or ADR mentions the value (`docs/design.md` "Validation").
-2. Update the tests that check the edges (`ValueObjectTest`, `ApiAttackIT`): the new max is
+2. Update the tests that check the edges (`ValueObjectTest`, `WorkflowIT`): the new max is
    accepted, max + 1 is rejected.
 3. Change `pricing.max-discount-bps` (and the UI label in `index.html` if it shows the range).
 4. Update `docs/design.md` and the README if they state the value.
