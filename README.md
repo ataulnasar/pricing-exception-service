@@ -251,7 +251,20 @@ secret, so the secret should live in a protected environment before wider use.
 
 ## Time spent
 
-TODO: <fill in>
+About **6 hours** of my own working time in total:
+
+| Part | Hours |
+|---|---|
+| Design and planning (design, ADR decisions, invariants, agent setup) | 1 |
+| Setup (Phase 0: project, GitHub, CI) | 0.5 |
+| Building the service (Phases 1–5) | 2 |
+| Docs, UI and AI review agent (Phases 6–8) | 1.5 |
+| Manual testing and fixes | 1 |
+| **Total** | **6** |
+
+The hours are my hands-on time: planning, reviewing each phase report, deciding,
+and testing. The AI agents ran the phases partly on their own while I reviewed,
+so their run time is not counted separately.
 
 ## AI usage
 

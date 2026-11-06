@@ -52,5 +52,5 @@ The `Proved by` column lists the tests or documents that show each requirement i
 | ID | Item | Done |
 |---|---|---|
 | S1 | Share the repository | TODO |
-| S2 | Include the time spent | TODO |
+| S2 | Include the time spent | ✅ README "Time spent" (about 6 hours) |
 | S3 | Be ready to walk through choices, run a scenario, and say what you would do next | TODO |
