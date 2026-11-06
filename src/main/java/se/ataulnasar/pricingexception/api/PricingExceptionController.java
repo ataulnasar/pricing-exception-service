@@ -55,10 +55,7 @@ public class PricingExceptionController {
                                     @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey,
                                     @Valid @RequestBody CreateRequestBody body) {
         if (idempotencyKey == null) {
-            RequestView view = service.create(caller, body.applicationId(), body.discountBps(), body.reason());
-            return ResponseEntity.created(location(view.request().id()))
-                    .eTag(etag(view))
-                    .body(PricingExceptionResponse.from(view));
+            return created(service.create(caller, body.applicationId(), body.discountBps(), body.reason()));
         }
         String key = requireValidKey(idempotencyKey);
         IdempotentResult result = service.createIdempotently(caller, key,
@@ -79,7 +76,7 @@ public class PricingExceptionController {
     private static ResponseEntity<String> replayable(IdempotentResult result) {
         ResponseEntity.BodyBuilder response = ResponseEntity.status(result.status())
                 .location(location(result.requestId()))
-                .eTag("\"" + result.version() + "\"")
+                .eTag(etag(result.version()))
                 .contentType(MediaType.APPLICATION_JSON);
         if (result.replayed()) {
             response.header(IDEMPOTENT_REPLAYED, "true");
@@ -128,10 +125,7 @@ public class PricingExceptionController {
                                        @Valid @RequestBody SupersedeBody body) {
         long expectedVersion = IfMatch.requiredVersion(ifMatch);
         if (idempotencyKey == null) {
-            RequestView view = service.supersede(caller, id, expectedVersion, body.discountBps(), body.reason());
-            return ResponseEntity.created(location(view.request().id()))
-                    .eTag(etag(view))
-                    .body(PricingExceptionResponse.from(view));
+            return created(service.supersede(caller, id, expectedVersion, body.discountBps(), body.reason()));
         }
         String key = requireValidKey(idempotencyKey);
         IdempotentResult result = service.supersedeIdempotently(caller, key,
@@ -140,15 +134,21 @@ public class PricingExceptionController {
         return replayable(result);
     }
 
+    private static ResponseEntity<PricingExceptionResponse> created(RequestView view) {
+        return ResponseEntity.created(location(view.request().id()))
+                .eTag(etag(view.version()))
+                .body(PricingExceptionResponse.from(view));
+    }
+
     private static ResponseEntity<PricingExceptionResponse> withEtag(RequestView view) {
-        return ResponseEntity.ok().eTag(etag(view)).body(PricingExceptionResponse.from(view));
+        return ResponseEntity.ok().eTag(etag(view.version())).body(PricingExceptionResponse.from(view));
     }
 
     private static URI location(UUID id) {
         return URI.create(BASE_PATH + "/" + id);
     }
 
-    private static String etag(RequestView view) {
-        return "\"" + view.version() + "\"";
+    private static String etag(long version) {
+        return "\"" + version + "\"";
     }
 }

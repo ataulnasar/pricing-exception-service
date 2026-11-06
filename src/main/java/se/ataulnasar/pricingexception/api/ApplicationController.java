@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import se.ataulnasar.pricingexception.application.ApplicationInfo;
+import se.ataulnasar.pricingexception.application.ApprovedDiscount;
 import se.ataulnasar.pricingexception.application.PricingExceptionService;
 import se.ataulnasar.pricingexception.application.ReferenceDataService;
 import se.ataulnasar.pricingexception.application.UserInfo;
@@ -36,7 +37,7 @@ public class ApplicationController {
 
     /** Design decision 5: a small, separate read for the mortgage process. */
     @GetMapping("/applications/{id}/approved-discount")
-    public ApprovedDiscountResponse approvedDiscount(Actor caller, @PathVariable String id) {
-        return ApprovedDiscountResponse.from(service.approvedDiscount(caller, id));
+    public ApprovedDiscount approvedDiscount(Actor caller, @PathVariable String id) {
+        return service.approvedDiscount(caller, id);
     }
 }

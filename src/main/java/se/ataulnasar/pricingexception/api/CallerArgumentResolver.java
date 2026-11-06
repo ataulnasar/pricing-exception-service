@@ -1,20 +1,23 @@
 package se.ataulnasar.pricingexception.api;
 
+import java.util.List;
 import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import se.ataulnasar.pricingexception.application.UserLookup;
 import se.ataulnasar.pricingexception.domain.Actor;
 
 /**
  * Resolves the caller from the {@code X-User-Id} header for every controller method that takes an
  * {@link Actor}. Missing or unknown ids are 401; roles are checked by the domain, not here.
+ * Registers itself with Spring MVC.
  */
 @Component
-public class CallerArgumentResolver implements HandlerMethodArgumentResolver {
+public class CallerArgumentResolver implements HandlerMethodArgumentResolver, WebMvcConfigurer {
 
     public static final String HEADER = "X-User-Id";
 
@@ -22,6 +25,11 @@ public class CallerArgumentResolver implements HandlerMethodArgumentResolver {
 
     public CallerArgumentResolver(UserLookup users) {
         this.users = users;
+    }
+
+    @Override
+    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+        resolvers.add(this);
     }
 
     @Override

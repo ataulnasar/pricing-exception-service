@@ -12,7 +12,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.validation.FieldError;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -89,7 +88,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail beanValidation(MethodArgumentNotValidException e) {
         List<FieldViolation> errors = e.getBindingResult().getFieldErrors().stream()
-                .map(f -> new FieldViolation(f.getField(), message(f)))
+                .map(f -> new FieldViolation(f.getField(), f.getDefaultMessage() == null ? "invalid" : f.getDefaultMessage()))
                 .toList();
         ProblemDetail problem = problem(HttpStatus.UNPROCESSABLE_CONTENT, VALIDATION_FAILED,
                 "request body is not valid");
@@ -142,9 +141,5 @@ public class ApiExceptionHandler {
         problem.setTitle(status.getReasonPhrase());
         problem.setProperty("code", code);
         return problem;
-    }
-
-    private static String message(FieldError f) {
-        return f.getDefaultMessage() == null ? "invalid" : f.getDefaultMessage();
     }
 }

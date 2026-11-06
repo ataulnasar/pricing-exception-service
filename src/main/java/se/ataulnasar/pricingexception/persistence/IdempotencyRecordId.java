@@ -24,14 +24,6 @@ public class IdempotencyRecordId implements Serializable {
         this.idemKey = idemKey;
     }
 
-    public String getCallerId() {
-        return callerId;
-    }
-
-    public String getIdemKey() {
-        return idemKey;
-    }
-
     @Override
     public boolean equals(Object o) {
         return o instanceof IdempotencyRecordId other
