@@ -74,17 +74,19 @@ Errors use ProblemDetail (RFC 9457) with an extra `code` field.
 - `request_event` (id, request_id, type, actor_id, occurred_at, from_status, to_status, comment) — insert only
 - `idempotency_record` (caller_id, idem_key, request_hash, response_status, response_body, created_at), PK (caller_id, idem_key)
 
-## Packages (`se.ataulnasar.pricingexception`)
-`domain` (plain Java) · `application` (services) · `api` (controllers, DTOs) · `persistence` (JPA)
+## Packages (`se.ataulnasar.pricingexception`, classic Spring MVC, see ADR-007)
+`controller` (@RestController) · `service` (@Service: every business rule, transactions, idempotency) ·
+`repository` (Spring Data JPA) · `model` (@Entity classes, enums, `Actor`) · `dto` (request/response records) ·
+`exception` (`ApiProblem`, business-rule exceptions, ProblemDetail handler) · `config` (Clock, JSON, properties, `X-User-Id` resolver)
 
-## Domain error codes and events
-- **Error codes** (stable `code` on domain exceptions, mapped to ProblemDetail in `api`):
+## Business-rule error codes and events
+- **Error codes** (stable `code` on the exceptions in `exception`, mapped to ProblemDetail by `ApiExceptionHandler`):
   - `ForbiddenActionException`: `WRONG_ROLE`, `SELF_REVIEW`, `OVER_APPROVAL_LIMIT`, `NOT_OWNER`
   - `InvalidTransitionException`: `INVALID_TRANSITION`
   - `ValidationException`: `INVALID_DISCOUNT`, `INVALID_REASON`, `INVALID_COMMENT`
 - **Event types** (`request_event.type`, one per status change): `SUBMITTED`, `APPROVED`, `DECLINED`, `WITHDRAWN`, `SUPERSEDED`
-- **Check order for decisions** (approve / decline): status, then role, then self-review, then approval limit.
-- **INV-06** (application must be OPEN) is checked in the application service, not in the domain.
+- **Check order for decisions** (approve / decline): status, then role, then self-review, then approval limit, then comment length. All checks run in `PricingExceptionService` before any field of the entity changes.
+- **INV-06** (application must be OPEN) is checked in `PricingExceptionService` after the checks above.
 
 ## API error codes
 Every error is an RFC 9457 ProblemDetail (`application/problem+json`) with `status`, `title`,

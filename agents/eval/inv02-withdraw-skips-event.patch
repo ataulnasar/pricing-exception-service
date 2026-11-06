@@ -1,13 +1,14 @@
-diff --git a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-index 8f78613..2db5c89 100644
---- a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-+++ b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-@@ -211,7 +211,7 @@ public final class PricingExceptionRequest {
-         Objects.requireNonNull(clock, "clock");
-         requirePending("withdraw");
-         requireOwner(actor, "withdraw");
--        transition(RequestStatus.WITHDRAWN, RequestEvent.Type.WITHDRAWN, actor, clock.instant(), null);
-+        status = RequestStatus.WITHDRAWN;
+diff --git a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+index ceec19a..2f53dfc 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
++++ b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+@@ -185,7 +185,8 @@ public class PricingExceptionService {
+         requireVersion(entity, expectedVersion);
+         requirePending(entity, "withdraw");
+         requireOwner(entity, caller, "withdraw");
+-        transition(entity, RequestStatus.WITHDRAWN, EventType.WITHDRAWN, caller, clock.instant(), null);
++        entity.setStatus(RequestStatus.WITHDRAWN);
++        entity.setActiveApplicationId(null);
+         return PricingExceptionResponse.from(requests.saveAndFlush(entity), null);
      }
  
-     /**

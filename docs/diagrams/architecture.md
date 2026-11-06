@@ -25,42 +25,48 @@ flowchart LR
 
 ## 2. Layers inside the service
 
-Package `se.ataulnasar.pricingexception`. Arrows show allowed dependencies.
+Package `se.ataulnasar.pricingexception`, classic Spring MVC (ADR-007). Arrows show allowed dependencies.
 
 ```mermaid
 flowchart TB
-    subgraph api["api"]
-        ctrl["PricingExceptionController<br/>ApplicationController"]
-        web["CallerArgumentResolver (X-User-Id)<br/>IfMatch, ApiExceptionHandler (ProblemDetail)"]
+    subgraph controller["controller"]
+        ctrl["PricingExceptionController<br/>ApplicationController, IfMatch"]
     end
-    subgraph application["application"]
-        svc["PricingExceptionService<br/>(one transaction per command)"]
-        idem["IdempotencyService<br/>IdempotencyPurge"]
+    subgraph service["service"]
+        svc["PricingExceptionService<br/>(all business rules, one transaction per command)"]
+        idem["IdempotencyService, IdempotencyTransactions<br/>IdempotencyPurge"]
         ref["ReferenceDataService, UserLookup"]
-        err["ApiProblem<br/>(one status + code error type)"]
     end
-    subgraph domain["domain (plain Java)"]
-        agg["PricingExceptionRequest<br/>(all business rules)"]
-        vo["DiscountBps, Reason, Actor,<br/>RequestStatus, RequestEvent"]
+    subgraph repository["repository"]
+        repo["Spring Data JPA repositories<br/>(request and idempotency: no delete)"]
     end
-    subgraph persistence["persistence"]
-        repo["Repositories<br/>(request and idempotency: no delete)"]
-        map["PricingExceptionRequestMapper"]
-        ent["JPA entities<br/>(request entity has @Version)"]
+    subgraph model["model"]
+        ent["JPA entities (request entity has @Version)<br/>RequestStatus, EventType, Role, Actor"]
+    end
+    subgraph dto["dto"]
+        dtos["CreateRequestBody, DecisionBody, SupersedeBody<br/>PricingExceptionResponse, EventResponse, ..."]
+    end
+    subgraph exception["exception"]
+        err["ApiProblem, ForbiddenActionException,<br/>InvalidTransitionException, ValidationException<br/>ApiExceptionHandler (ProblemDetail)"]
+    end
+    subgraph config["config"]
+        cfg["AppConfig (Clock, strict JSON)<br/>PricingProperties, CallerArgumentResolver (X-User-Id)"]
     end
     db[("Flyway schema<br/>H2 / PostgreSQL")]
 
-    api --> application
-    application --> domain
-    application --> persistence
-    persistence --> domain
-    persistence --> db
+    controller --> service
+    controller --> dto
+    service --> repository
+    service --> model
+    service --> dto
+    repository --> model
+    repository --> db
 ```
 
-Rules checked by ArchUnit on every build (`DomainArchitectureTest`, `ArchitectureRulesTest`):
+Rules checked by ArchUnit on every build (`ArchitectureRulesTest`):
 
-- `domain` has no Spring, JPA or Jackson imports, and depends on no other layer.
-- `api` never depends on `persistence`.
+- `controller` never depends on `repository`; every `@RestController` is in `controller`, every `@Service` in `service`.
+- Nothing below the controllers depends on them; `repository` and `model` do not depend on `service` or `dto`.
 - No `Instant.now()` (time comes from an injected `Clock`), no field injection, no Lombok.
 
 ## 3. What happens on a decision
@@ -70,7 +76,6 @@ sequenceDiagram
     actor Reviewer
     participant C as PricingExceptionController
     participant S as PricingExceptionService
-    participant D as PricingExceptionRequest (domain)
     participant DB as Database
 
     Reviewer->>C: POST /{id}/decision<br/>X-User-Id, If-Match: "0", body
@@ -78,12 +83,11 @@ sequenceDiagram
     C->>S: decide(caller, id, version, outcome, comment)
     S->>DB: load request + events (transaction starts)
     S->>S: version == If-Match? else 412
-    S->>D: approve(reviewer, comment, clock)
-    D->>D: check status, role, self-review, limit
-    D-->>S: new state + one RequestEvent
+    S->>S: check status, role, self-review, limit, comment
     S->>S: approve only: application OPEN? else 409 (INV-06)
+    S->>S: set decision fields, status, active slot; append one event
     S->>DB: save request (@Version) + event, commit
-    S-->>C: view with new version
+    S-->>C: response with new version
     C-->>Reviewer: 200 + ETag: "1"
 ```
 

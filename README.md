@@ -209,7 +209,7 @@ One main test per requirement. The full list, with the deliverables and constrai
 5. **Open reviewer notes from phases 3 to 5:**
    - The `ACTIVE_REQUEST_EXISTS` mapping finds the unique index by its name in the database
      error message. That text depends on the driver.
-   - The approved discount column is nullable in the database. Only the domain guarantees a
+   - The approved discount column is nullable in the database. Only the service guarantees a
      value for APPROVED rows. Consider a CHECK or NOT NULL rule.
    - The approved-discount and `supersededById` lookups load the full event history. They need one
      column. Use projections.
@@ -290,7 +290,7 @@ for the agent definitions.
 
 - [docs/design.md](docs/design.md): the design, decisions, tables and API.
 - [docs/invariants.yaml](docs/invariants.yaml): the business rules (INV-01 to INV-06).
-- [docs/adr/](docs/adr/): architecture decision records (ADR-001 to ADR-006).
+- [docs/adr/](docs/adr/): architecture decision records (ADR-001 to ADR-007; ADR-007 is the classic Spring MVC layout).
 - [docs/diagrams/state-machine.md](docs/diagrams/state-machine.md): request states and the supersede sequence.
 - [docs/diagrams/architecture.md](docs/diagrams/architecture.md): system context, layers, decision flow, tables.
 - [docs/diagrams/development-flow.md](docs/diagrams/development-flow.md): how the AI agents and the human built each phase.

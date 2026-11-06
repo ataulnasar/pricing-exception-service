@@ -1,0 +1,37 @@
+diff --git a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+index ceec19a..de74347 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
++++ b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+@@ -185,7 +185,7 @@ public class PricingExceptionService {
+         requireVersion(entity, expectedVersion);
+         requirePending(entity, "withdraw");
+         requireOwner(entity, caller, "withdraw");
+-        transition(entity, RequestStatus.WITHDRAWN, EventType.WITHDRAWN, caller, clock.instant(), null);
++        transition(entity, RequestStatus.WITHDRAWN, EventType.WITHDRAWN, caller, now(), null);
+         return PricingExceptionResponse.from(requests.saveAndFlush(entity), null);
+     }
+ 
+@@ -208,7 +208,7 @@ public class PricingExceptionService {
+         requireOwner(old, caller, "supersede");
+         requireOpen(loadApplication(old.getApplicationId()));
+ 
+-        transition(old, RequestStatus.SUPERSEDED, EventType.SUPERSEDED, caller, clock.instant(), null);
++        transition(old, RequestStatus.SUPERSEDED, EventType.SUPERSEDED, caller, now(), null);
+         requests.saveAndFlush(old); // active_application_id is now NULL; the unique index is free
+ 
+         PricingExceptionRequestEntity replacement = newRequest(old.getApplicationId(), caller, discountBps, reason, old.getId());
+@@ -244,9 +244,13 @@ public class PricingExceptionService {
+         return entity;
+     }
+ 
++    private Instant now() {
++        return clock.instant();
++    }
++
+     private void recordDecision(PricingExceptionRequestEntity entity, RequestStatus to, EventType type,
+                                 Actor reviewer, String comment) {
+-        Instant now = clock.instant();
++        Instant now = now();
+         entity.setDecidedBy(reviewer.id());
+         entity.setDecidedAt(now);
+         entity.setDecisionComment(comment);

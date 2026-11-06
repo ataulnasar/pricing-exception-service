@@ -1,6 +1,6 @@
 # AI review agent: evaluation set
 
-Eight patches against the current HEAD, each changing only `src/main` code.
+Eight patches against the current HEAD, each changing only `src/main/.../service/PricingExceptionService.java`.
 - `inv01..inv06-*.patch`: each breaks exactly one business rule (INV-01..INV-06) in a subtle way.
 - `clean01-*.patch`, `clean02-*.patch`: refactors that keep behaviour. The reviewer should report nothing.
 - `expected.json`: per case the patch file, the expected invariant (`INV-0N` or `none`), a description,

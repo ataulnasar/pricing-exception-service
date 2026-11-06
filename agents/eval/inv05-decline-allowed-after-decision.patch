@@ -1,15 +1,15 @@
-diff --git a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-index 8f78613..5f1e4ad 100644
---- a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-+++ b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-@@ -193,7 +193,9 @@ public final class PricingExceptionRequest {
-     public void decline(Actor reviewer, String comment, Clock clock) {
-         Objects.requireNonNull(reviewer, "reviewer");
-         Objects.requireNonNull(clock, "clock");
--        requirePending("decline");
-+        if (status == RequestStatus.WITHDRAWN || status == RequestStatus.SUPERSEDED) {
-+            throw new InvalidTransitionException(status, "decline");
-+        }
-         requireRole(reviewer, Role.REVIEWER, "decline");
-         requireNotRequester(reviewer);
-         validateComment(comment);
+diff --git a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+index ceec19a..a3d5689 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
++++ b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+@@ -167,7 +167,9 @@ public class PricingExceptionService {
+             entity.setApprovedDiscountBps(entity.getDiscountBps());  // INV-01: the discount the reviewer saw
+             recordDecision(entity, RequestStatus.APPROVED, EventType.APPROVED, caller, comment);
+         } else {
+-            requirePending(entity, "decline");
++            if (entity.getStatus() == RequestStatus.WITHDRAWN || entity.getStatus() == RequestStatus.SUPERSEDED) {
++                throw new InvalidTransitionException(entity.getStatus(), "decline");
++            }
+             requireRole(caller, Role.REVIEWER, "decline");
+             requireNotRequester(entity, caller);
+             requireValidComment(comment);

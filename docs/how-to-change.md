@@ -14,7 +14,7 @@ Read this before you change anything. The project guide (`/ask` in Claude Code, 
 5. **No new dependency** without approval.
 6. Follow `CLAUDE.md` (constructor injection, injected `Clock`, no `Instant.now()`,
    basis points as `int`, ProblemDetail errors with a `code`). ArchUnit checks several
-   of these on every build (`DomainArchitectureTest`, `ArchitectureRulesTest`).
+   of these on every build (`ArchitectureRulesTest`).
 7. Finish with `./mvnw verify` green, the commit checklist in `docs/agent-workflow.md`,
    and one line in `docs/ai-usage.md` if agents helped.
 
@@ -22,13 +22,13 @@ Read this before you change anything. The project guide (`/ask` in Claude Code, 
 
 | You want to change | Look here first |
 |---|---|
-| A business rule (who may do what, which status changes are allowed) | `domain/PricingExceptionRequest.java` (`submit`, `approve`, `decline`, `withdraw`, `markSuperseded`) |
-| Valid values (discount range, reason length) | `domain/DiscountBps.java`, `domain/Reason.java`, `pricing.max-discount-bps` in `application.properties` |
-| A use case, transactions, idempotency | `application/PricingExceptionService.java`, `application/IdempotencyService.java` |
-| An endpoint, headers, If-Match, ETag | `api/PricingExceptionController.java`, `api/ApplicationController.java`, `api/IfMatch.java` |
-| Error codes and HTTP status | `application/ApiProblem.java` (one type with a factory per code), the domain exceptions, `api/ApiExceptionHandler.java`, `docs/design.md` "API error codes" |
-| Who the caller is (`X-User-Id`) | `api/CallerArgumentResolver.java`, `application/UserLookup.java` |
-| Tables and columns | `src/main/resources/db/migration/` (new file), `persistence/*Entity.java`, `persistence/PricingExceptionRequestMapper.java` |
+| A business rule (who may do what, which status changes are allowed) | `service/PricingExceptionService.java` (`create`, `decide`, `withdraw`, `supersede` and the private `require*` checks; every status change goes through `transition`) |
+| Valid values (discount range, reason length) | `requireValidDiscount`, `requireValidReason`, `requireValidComment` in `service/PricingExceptionService.java`, `pricing.max-discount-bps` in `application.properties` |
+| A use case, transactions, idempotency | `service/PricingExceptionService.java`, `service/IdempotencyService.java`, `service/IdempotencyTransactions.java` |
+| An endpoint, headers, If-Match, ETag | `controller/PricingExceptionController.java`, `controller/ApplicationController.java`, `controller/IfMatch.java` |
+| Error codes and HTTP status | `exception/ApiProblem.java` (one type with a factory per code), the business-rule exceptions in `exception/`, `exception/ApiExceptionHandler.java`, `docs/design.md` "API error codes" |
+| Who the caller is (`X-User-Id`) | `config/CallerArgumentResolver.java`, `service/UserLookup.java` |
+| Tables and columns | `src/main/resources/db/migration/` (new file), `model/*Entity.java`, `repository/*Repository.java` |
 | Local seed data | `src/main/resources/db/seed/` (default profile only) |
 | The UI | `src/main/resources/static/index.html`, `app.js` |
 
@@ -38,7 +38,7 @@ Read this before you change anything. The project guide (`/ask` in Claude Code, 
 
 ### Change a limit or a value (e.g. max discount from 100 to 150 bps)
 1. Check whether a rule or ADR mentions the value (`docs/design.md` "Validation").
-2. Update the tests that check the edges (`ValueObjectTest`, `WorkflowIT`): the new max is
+2. Update the tests that check the edges (`PricingExceptionServiceTest`, `WorkflowIT`): the new max is
    accepted, max + 1 is rejected.
 3. Change `pricing.max-discount-bps` (and the UI label in `index.html` if it shows the range).
 4. Update `docs/design.md` and the README if they state the value.
@@ -46,21 +46,21 @@ Read this before you change anything. The project guide (`/ask` in Claude Code, 
 ### Add a new field to a request (e.g. a customer segment)
 1. Decide: is it part of what the reviewer approves? If yes, it must be immutable like the
    discount (INV-01). Write that down in an ADR.
-2. Tests: domain (`PricingExceptionRequestTest`, `ReconstituteTest`), persistence
+2. Tests: service (`PricingExceptionServiceTest`), repository
    (`PricingExceptionRequestRepositoryTest`), API (`PricingExceptionControllerTest`, `WorkflowIT`).
-3. Code: domain value + `submit`/`reconstitute`, new Flyway migration, entity + mapper,
-   request/response records in `api`, idempotency hash input if the field is in the
+3. Code: validation in the service, new Flyway migration, entity column in `model`,
+   request/response records in `dto`, idempotency hash input if the field is in the
    create body (`IdempotencyHashTest` pins the hash).
 4. Docs: `docs/design.md` API and tables.
 
 ### Add a new action or status (e.g. "revoke an approval")
 1. **Business-rule change.** Update `docs/invariants.yaml` and add an ADR first:
    which statuses it moves between, who may do it, does it free the application's slot (INV-04).
-2. Tests: extend `StatusCommandMatrixTest` (every status × command), add role and
+2. Tests: extend the status × command table in `PricingExceptionServiceTest`, add role and
    owner tests, an end-to-end IT, and a concurrency test if two people can race.
-3. Code: a domain method that validates, then changes state and returns one `RequestEvent`
-   (INV-02); a service method in one transaction with an expected version (If-Match, INV-05);
-   a controller endpoint; error mapping.
+3. Code: a service method in one transaction that loads the row, checks the expected version
+   (If-Match, INV-05), runs the `require*` checks in the documented order, and calls `transition`
+   once so exactly one event is written (INV-02); a controller endpoint; error mapping.
 4. The enum is stored as text, so a new status needs no migration, but check
    `active_application_id` logic. Update `docs/diagrams/state-machine.md`.
 
