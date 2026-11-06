@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import se.ataulnasar.pricingexception.application.ApiProblem;
 import se.ataulnasar.pricingexception.application.CreateRequestCommand;
 import se.ataulnasar.pricingexception.application.IdempotentResult;
 import se.ataulnasar.pricingexception.application.PricingExceptionService;
@@ -67,7 +68,7 @@ public class PricingExceptionController {
     private static String requireValidKey(String idempotencyKey) {
         String key = idempotencyKey.trim();
         if (key.isEmpty() || key.length() > MAX_KEY_LENGTH) {
-            throw new MalformedRequestException(IDEMPOTENCY_KEY + " must be 1 to " + MAX_KEY_LENGTH + " characters");
+            throw ApiProblem.malformedRequest(IDEMPOTENCY_KEY + " must be 1 to " + MAX_KEY_LENGTH + " characters");
         }
         return key;
     }

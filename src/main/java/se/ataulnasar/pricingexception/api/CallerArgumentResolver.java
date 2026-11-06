@@ -8,6 +8,7 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import se.ataulnasar.pricingexception.application.ApiProblem;
 import se.ataulnasar.pricingexception.application.UserLookup;
 import se.ataulnasar.pricingexception.domain.Actor;
 
@@ -42,10 +43,10 @@ public class CallerArgumentResolver implements HandlerMethodArgumentResolver, We
                                   NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
         String userId = webRequest.getHeader(HEADER);
         if (userId == null || userId.isBlank()) {
-            throw new UnauthenticatedException("missing " + HEADER + " header");
+            throw ApiProblem.unauthenticated("missing " + HEADER + " header");
         }
         // No trimming: the id must match the user table exactly (HTTP already strips field whitespace).
         return users.findActor(userId)
-                .orElseThrow(() -> new UnauthenticatedException("unknown user"));
+                .orElseThrow(() -> ApiProblem.unauthenticated("unknown user"));
     }
 }
