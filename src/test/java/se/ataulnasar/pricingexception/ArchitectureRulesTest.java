@@ -3,6 +3,10 @@ package se.ataulnasar.pricingexception;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
+import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameStartingWith;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
 
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -14,6 +18,8 @@ import java.time.ZonedDateTime;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RestController;
+import se.ataulnasar.pricingexception.model.PricingExceptionRequestEntity;
+import se.ataulnasar.pricingexception.service.PricingExceptionService;
 
 /** CLAUDE.md code-style and layering rules for the classic MVC layout (ADR-007). */
 @AnalyzeClasses(packages = "se.ataulnasar.pricingexception", importOptions = ImportOption.DoNotIncludeTests.class)
@@ -61,6 +67,15 @@ class ArchitectureRulesTest {
             .that().resideInAnyPackage(REPOSITORY, MODEL)
             .should().dependOnClassesThat().resideInAnyPackage(SERVICE, DTO)
             .because("repositories and entities are the bottom layer (ADR-007)");
+
+    /** INV-01: the request row is only ever written by the service. Entity setters exist for JPA and the service. */
+    @ArchTest
+    static final ArchRule INV01_only_the_service_writes_the_request_entity = noClasses()
+            .that().doNotHaveFullyQualifiedName(PricingExceptionService.class.getName())
+            .should().callMethodWhere(target(owner(assignableTo(PricingExceptionRequestEntity.class)))
+                    .and(target(nameStartingWith("set"))))
+            .because("a submitted request never changes (INV-01); only PricingExceptionService sets request fields, "
+                    + "and only through newRequest, recordDecision and transition (ADR-007)");
 
     @ArchTest
     static final ArchRule no_field_injection = noFields()

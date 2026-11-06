@@ -479,4 +479,22 @@ class PricingExceptionRequestRepositoryTest {
             assertThat(r.getActiveApplicationId() != null).isEqualTo(r.getStatus().isActive());
         }
     }
+
+    @Test
+    void INV04_every_stored_row_has_an_active_application_id_that_matches_its_status() {
+        // JUDGEMENT: the schema cannot tie active_application_id to status (ck_per_active only checks the value).
+        // The old mapper rejected such a row on load; now this test checks every row, seed and test rows alike.
+        for (RequestStatus s : RequestStatus.values()) {
+            requests.saveAndFlush(entityIn("MA-T00" + (1 + s.ordinal()), s));
+        }
+        em.clear();
+        List<PricingExceptionRequestEntity> all = requests.findAll();
+        assertThat(all).hasSizeGreaterThanOrEqualTo(RequestStatus.values().length + 3);
+        for (PricingExceptionRequestEntity r : all) {
+            assertThat(r.getActiveApplicationId()).as("row %s in status %s", r.getId(), r.getStatus())
+                    .isEqualTo(r.getStatus().isActive() ? r.getApplicationId() : null);
+            assertThat(r.getApprovedDiscountBps()).as("approved discount of %s", r.getId())
+                    .isEqualTo(r.getStatus() == RequestStatus.APPROVED ? Integer.valueOf(r.getDiscountBps()) : null);
+        }
+    }
 }

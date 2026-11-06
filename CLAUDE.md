@@ -58,7 +58,7 @@ If a task would break one of these rules, **stop and ask**. Do not work around i
 - No Lombok. Use Java records for DTOs and value objects.
 - Time comes from an injected `java.time.Clock`, never `Instant.now()` directly.
 - Money and rates are whole numbers in basis points (`int`), never `double`.
-- Errors: domain exceptions with a stable error `code`, mapped to ProblemDetail in `api`.
+- Errors: business-rule exceptions (`exception` package) with a stable error `code`, mapped to ProblemDetail by `ApiExceptionHandler`.
 - `decidedBy` and `decidedAt` come from the caller and the clock, **never from the request body**.
 - Show user text (like `reason`) as text, never as HTML.
 
