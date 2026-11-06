@@ -13,6 +13,7 @@ each phase: [../ai-usage.md](../ai-usage.md).
 | test-writer | agent in `.claude/agents/` | `src/test/` only | Sonnet |
 | reviewer | agent in `.claude/agents/` | nothing (read only) | Sonnet |
 | docs-writer | agent in `.claude/agents/` | `README.md`, `docs/`, `http/`, `scripts/` | Haiku |
+| project-guide | agent in `.claude/agents/` (`/ask`), also a CLI `agents/ask.py` | nothing (read only) | Sonnet |
 
 Agents are split by **what they may see and change**, not by job title. The checking agents
 use a different model from the one that writes the code.
@@ -54,7 +55,7 @@ flowchart LR
     subgraph ci["ci.yml"]
         java["Java: ./mvnw verify<br/>unit, web, integration,<br/>concurrency, ArchUnit"]
         pg["PostgreSQL tests<br/>(Testcontainers, must run)"]
-        py["Python tests for<br/>the review agent"]
+        py["Python tests for the review<br/>agent and the project guide CLI"]
     end
     subgraph air["ai-review.yml (pull requests)"]
         key{"API key<br/>secret set?"}
@@ -74,7 +75,30 @@ flowchart LR
   plus 2 clean refactors (`agents/eval/`). The live AI run needs an API key and has not been
   run; see `agents/eval/results.md`.
 
-## 4. Controls on agent output
+## 4. After the build: the project guide
+
+A developer who did not take part asks the **project-guide** agent (`/ask "<question>"` in
+Claude Code, or `python3 agents/ask.py "<question>"` from a terminal, same instructions in
+`agents/project-guide-prompt.md`). It reads only the repository: `docs/invariants.yaml` first,
+then `docs/design.md` and the ADRs, `docs/how-to-change.md`, the AI usage log, the git log and
+the source files that match the question. It cites the files it used, says when the docs and
+the code disagree, and for a change question names the invariants touched, the tests to write
+first and the files to change. It never changes a file.
+
+```mermaid
+flowchart LR
+    q["Developer question"]
+    r["Rules, design, ADRs,<br/>how-to-change.md, ai-usage.md"]
+    s["git log + matching<br/>source files"]
+    g["project-guide<br/>(read only)"]
+    a["Answer with<br/>file references"]
+    q --> g
+    r --> g
+    s --> g
+    g --> a
+```
+
+## 5. Controls on agent output
 
 - Tests are written before the code, from the spec, not from the code.
 - A fresh test-writer attacks each phase. A read-only reviewer checks every diff.

@@ -249,6 +249,19 @@ wrong "no findings" can reassure a reviewer; costs scale with diff size (the dif
 `max_diff_chars`); anyone who can push a same-repo branch can also edit the workflow that holds the
 secret, so the secret should live in a protected environment before wider use.
 
+## Ask the project guide
+
+A read-only guide answers questions about what was built, how and why, and how to change
+something safely. It answers from the repository only (the rules, design, ADRs, the AI usage
+log, the git history and the source files that match the question) and names the files it used.
+
+- In Claude Code: `/ask "How do I add a revoke action for an approval?"` runs the agent in
+  `.claude/agents/project-guide.md`.
+- From the command line: `python3 agents/ask.py "How does idempotency work?"`. It needs
+  `ANTHROPIC_API_KEY`; `--dry-run` shows which files would be sent and needs no key.
+- Both follow the same instructions, `agents/project-guide-prompt.md`, and the change recipes in
+  [docs/how-to-change.md](docs/how-to-change.md). Read that file before you change anything.
+
 ## Time spent
 
 About **6 hours** of my own working time in total:
@@ -283,5 +296,6 @@ for the agent definitions.
 - [docs/diagrams/development-flow.md](docs/diagrams/development-flow.md): how the AI agents and the human built each phase.
 - [docs/runbook.md](docs/runbook.md): configuration, health, error codes, resetting the database, logs, PostgreSQL tests.
 - [docs/requirements.md](docs/requirements.md): the requirements and where each one is proved.
+- [docs/how-to-change.md](docs/how-to-change.md): golden rules, where things live, and recipes for common changes.
 - [http/requests.http](http/requests.http): the HTTP walkthrough.
 - OpenAPI: the app serves `/v3/api-docs` and a Swagger UI at `/swagger-ui/index.html` (springdoc). Send the `X-User-Id` header when you try calls from it.
