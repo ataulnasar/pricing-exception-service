@@ -102,7 +102,7 @@
     if (!response.ok) {
       throw new ApiError(response.status, json);
     }
-    return { status: response.status, body: json, etag: response.headers.get('ETag'), headers: response.headers };
+    return { status: response.status, body: json, etag: response.headers.get('ETag') };
   }
 
   function describe(error) {

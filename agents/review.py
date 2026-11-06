@@ -156,14 +156,13 @@ def validate(instance, schema, path="$"):
 def build_request(config, prompt, diff_text):
     user = ("Review this git diff. Remember: return one JSON object only.\n\n"
             "```diff\n" + diff_text + "\n```")
-    body = {
+    return {
         "model": config["model"],
         "max_tokens": config["max_tokens"],
         "system": prompt,
         "messages": [{"role": "user", "content": user}],
         "output_config": {"effort": config.get("effort", "medium")},
     }
-    return body
 
 
 def call_api(config, body, api_key):
@@ -247,9 +246,7 @@ def anchor_findings(findings, diff_files):
     """Keeps findings whose file and line are in the diff. Returns (kept, dropped)."""
     kept, dropped = [], []
     for f in findings:
-        path = f["file"]
-        if path.startswith("b/") or path.startswith("a/"):
-            path = path[2:]
+        path = strip_prefix(f["file"])
         lines = diff_files.get(path)
         if lines is None:
             # tolerate a path given relative to a deeper directory
@@ -400,7 +397,7 @@ def main(argv=None):
         return failed(f"The model did not return valid JSON: {e}")
 
     # Validate the envelope, then each finding on its own: one bad finding must not discard the review.
-    envelope_errors = [e for e in validate(dict(result, findings=[]), schema)]
+    envelope_errors = validate(dict(result, findings=[]), schema)
     if envelope_errors or not isinstance(result.get("findings"), list):
         return failed("The model output did not match the finding schema: " + "; ".join(envelope_errors[:5] or ["findings is not a list"]))
     item_schema = schema["properties"]["findings"]["items"]

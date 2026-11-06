@@ -63,15 +63,11 @@ def core_files(root):
 
 def keywords(question):
     """Words from the question that are worth searching for in the code."""
-    words = re.findall(r"[A-Za-z_][A-Za-z0-9_\-]{3,}", question)
-    seen, out = set(), []
-    for w in words:
-        k = w.lower()
-        if k in STOP_WORDS or k in seen:
-            continue
-        seen.add(k)
-        out.append(w)
-    return out
+    out = {}
+    for w in re.findall(r"[A-Za-z_][A-Za-z0-9_\-]{3,}", question):
+        if w.lower() not in STOP_WORDS:
+            out.setdefault(w.lower(), w)
+    return list(out.values())
 
 
 def code_files_for(root, question, limit=MAX_CODE_FILES):
