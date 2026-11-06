@@ -141,7 +141,6 @@ public final class PricingExceptionRequest {
         if (events.isEmpty() || events.get(0).type() != RequestEvent.Type.SUBMITTED) {
             throw new IllegalArgumentException("history of request " + id + " must start with a SUBMITTED event");
         }
-        RequestEvent previous = null;
         for (int i = 0; i < events.size(); i++) {
             RequestEvent e = events.get(i);
             Objects.requireNonNull(e, "event");
@@ -157,10 +156,10 @@ public final class PricingExceptionRequest {
             }
             // No check on occurredAt order: a clock stepping backwards between two commands must not
             // make a stored request unreadable. Persistence orders events by insertion id.
-            previous = e;
         }
-        if (previous.toStatus() != status) {
-            throw new IllegalArgumentException("history of request " + id + " ends in " + previous.toStatus()
+        RequestStatus last = events.get(events.size() - 1).toStatus();
+        if (last != status) {
+            throw new IllegalArgumentException("history of request " + id + " ends in " + last
                     + " but status is " + status);
         }
     }
@@ -180,13 +179,8 @@ public final class PricingExceptionRequest {
                             + "'s approval limit of " + reviewer.approvalLimitBps() + " bps");
         }
         validateComment(comment);
-
-        Instant now = clock.instant();
-        decidedBy = reviewer.id();
-        decidedAt = now;
-        decisionComment = comment;
         approvedDiscount = discount;
-        transition(RequestStatus.APPROVED, RequestEvent.Type.APPROVED, reviewer, now, comment);
+        decide(RequestStatus.APPROVED, RequestEvent.Type.APPROVED, reviewer, comment, clock);
     }
 
     /** Reviewer declines. No approval limit applies. */
@@ -197,12 +191,7 @@ public final class PricingExceptionRequest {
         requireRole(reviewer, Role.REVIEWER, "decline");
         requireNotRequester(reviewer);
         validateComment(comment);
-
-        Instant now = clock.instant();
-        decidedBy = reviewer.id();
-        decidedAt = now;
-        decisionComment = comment;
-        transition(RequestStatus.DECLINED, RequestEvent.Type.DECLINED, reviewer, now, comment);
+        decide(RequestStatus.DECLINED, RequestEvent.Type.DECLINED, reviewer, comment, clock);
     }
 
     /** The owner RM withdraws a pending request. */
@@ -288,6 +277,14 @@ public final class PricingExceptionRequest {
     }
 
     // ---------- checks ----------
+
+    private void decide(RequestStatus to, RequestEvent.Type type, Actor reviewer, String comment, Clock clock) {
+        Instant now = clock.instant();
+        decidedBy = reviewer.id();
+        decidedAt = now;
+        decisionComment = comment;
+        transition(to, type, reviewer, now, comment);
+    }
 
     private void transition(RequestStatus to, RequestEvent.Type type, Actor actor, Instant at, String comment) {
         RequestStatus from = status;

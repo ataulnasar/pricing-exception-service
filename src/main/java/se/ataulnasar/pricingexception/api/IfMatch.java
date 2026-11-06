@@ -1,6 +1,7 @@
 package se.ataulnasar.pricingexception.api;
 
 import java.util.regex.Pattern;
+import se.ataulnasar.pricingexception.application.ApiProblem;
 
 /**
  * Parses the {@code If-Match} header into the version the caller saw. Only the exact ETag form is
@@ -15,17 +16,17 @@ final class IfMatch {
 
     static long requiredVersion(String header) {
         if (header == null || header.isBlank()) {
-            throw new IfMatchRequiredException();
+            throw ApiProblem.ifMatchRequired();
         }
         var m = STRONG_ETAG.matcher(header.trim());
         if (!m.matches()) {
-            throw new MalformedRequestException(
+            throw ApiProblem.malformedRequest(
                     "If-Match must be the request's version exactly as returned in the ETag, for example \"0\"");
         }
         try {
             return Long.parseLong(m.group(1));
         } catch (NumberFormatException e) {
-            throw new MalformedRequestException("If-Match version is out of range");
+            throw ApiProblem.malformedRequest("If-Match version is out of range");
         }
     }
 }

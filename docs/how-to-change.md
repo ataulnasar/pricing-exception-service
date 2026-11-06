@@ -26,7 +26,7 @@ Read this before you change anything. The project guide (`/ask` in Claude Code, 
 | Valid values (discount range, reason length) | `domain/DiscountBps.java`, `domain/Reason.java`, `pricing.max-discount-bps` in `application.properties` |
 | A use case, transactions, idempotency | `application/PricingExceptionService.java`, `application/IdempotencyService.java` |
 | An endpoint, headers, If-Match, ETag | `api/PricingExceptionController.java`, `api/ApplicationController.java`, `api/IfMatch.java` |
-| Error codes and HTTP status | `api/ApiExceptionHandler.java`, the domain exceptions, `docs/design.md` "API error codes" |
+| Error codes and HTTP status | `application/ApiProblem.java` (one type with a factory per code), the domain exceptions, `api/ApiExceptionHandler.java`, `docs/design.md` "API error codes" |
 | Who the caller is (`X-User-Id`) | `api/CallerArgumentResolver.java`, `application/UserLookup.java` |
 | Tables and columns | `src/main/resources/db/migration/` (new file), `persistence/*Entity.java`, `persistence/PricingExceptionRequestMapper.java` |
 | Local seed data | `src/main/resources/db/seed/` (default profile only) |
@@ -38,7 +38,7 @@ Read this before you change anything. The project guide (`/ask` in Claude Code, 
 
 ### Change a limit or a value (e.g. max discount from 100 to 150 bps)
 1. Check whether a rule or ADR mentions the value (`docs/design.md` "Validation").
-2. Update the tests that check the edges (`ValueObjectTest`, `ApiAttackIT`): the new max is
+2. Update the tests that check the edges (`ValueObjectTest`, `WorkflowIT`): the new max is
    accepted, max + 1 is rejected.
 3. Change `pricing.max-discount-bps` (and the UI label in `index.html` if it shows the range).
 4. Update `docs/design.md` and the README if they state the value.

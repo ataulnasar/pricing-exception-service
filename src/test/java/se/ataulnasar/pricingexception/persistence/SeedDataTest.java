@@ -1,11 +1,14 @@
 package se.ataulnasar.pricingexception.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import se.ataulnasar.pricingexception.domain.RequestEvent;
@@ -26,16 +29,10 @@ class SeedDataTest {
                 .collect(Collectors.toMap(AppUserEntity::getId, u -> u));
 
         assertThat(byId).containsOnlyKeys("rm-anna", "rm-erik", "rev-sara", "rev-johan", "mortgage-system");
-        assertThat(byId.get("rm-anna").getRole()).isEqualTo(Role.RM);
-        assertThat(byId.get("rm-erik").getRole()).isEqualTo(Role.RM);
-        assertThat(byId.get("rev-sara").getRole()).isEqualTo(Role.REVIEWER);
-        assertThat(byId.get("rev-johan").getRole()).isEqualTo(Role.REVIEWER);
-        assertThat(byId.get("mortgage-system").getRole()).isEqualTo(Role.MORTGAGE_PROCESS);
-        assertThat(byId.get("rev-sara").getApprovalLimitBps()).isEqualTo(50);
-        assertThat(byId.get("rev-johan").getApprovalLimitBps()).isEqualTo(150);
-        assertThat(byId.get("rm-anna").getApprovalLimitBps()).isNull();
-        assertThat(byId.get("rm-erik").getApprovalLimitBps()).isNull();
-        assertThat(byId.get("mortgage-system").getApprovalLimitBps()).isNull();
+        assertThat(byId.values()).extracting(AppUserEntity::getId, AppUserEntity::getRole, AppUserEntity::getApprovalLimitBps)
+                .containsExactlyInAnyOrder(tuple("rm-anna", Role.RM, null), tuple("rm-erik", Role.RM, null),
+                        tuple("rev-sara", Role.REVIEWER, 50), tuple("rev-johan", Role.REVIEWER, 150),
+                        tuple("mortgage-system", Role.MORTGAGE_PROCESS, null));
     }
 
     @Test
@@ -56,12 +53,10 @@ class SeedDataTest {
 
     @Test
     void design_seed_has_one_approved_one_pending_one_declined_request() {
-        List<PricingExceptionRequestEntity> all = requests.findAll();
-
-        assertThat(all).hasSize(3);
-        assertThat(requests.findByStatus(RequestStatus.APPROVED)).hasSize(1);
-        assertThat(requests.findByStatus(RequestStatus.PENDING)).hasSize(1);
-        assertThat(requests.findByStatus(RequestStatus.DECLINED)).hasSize(1);
+        assertThat(requests.findAll()).hasSize(3);
+        for (RequestStatus s : List.of(RequestStatus.APPROVED, RequestStatus.PENDING, RequestStatus.DECLINED)) {
+            assertThat(requests.findByStatus(s)).as(s.name()).hasSize(1);
+        }
     }
 
     @Test
@@ -74,56 +69,28 @@ class SeedDataTest {
         }
     }
 
-    @Test
-    void INV01_seed_approved_request_stores_approved_discount_equal_to_discount() {
-        PricingExceptionRequestEntity r = requests.findByStatus(RequestStatus.APPROVED).get(0);
+    /** status, decided (decidedBy and decidedAt set), event count, type of the last event. */
+    @ParameterizedTest(name = "seed {0} request has the decision fields of its status")
+    @CsvSource({"APPROVED,true,2,APPROVED", "DECLINED,true,2,DECLINED", "PENDING,false,1,SUBMITTED"})
+    void seed_request_has_the_decision_fields_of_its_status(RequestStatus status, boolean decided, int events,
+                                                           RequestEvent.Type lastEvent) {
+        PricingExceptionRequestEntity r = requests.findByStatus(status).get(0);
 
-        assertThat(r.getApprovedDiscountBps()).isEqualTo(r.getDiscountBps());
-        assertThat(r.getDecidedBy()).isNotBlank();
-        assertThat(r.getDecidedAt()).isNotNull();
-        assertThat(r.getEvents()).hasSize(2);
-        assertThat(r.getEvents().get(1).getType()).isEqualTo(RequestEvent.Type.APPROVED);
+        assertThat(r.getDecidedBy() != null).isEqualTo(decided);
+        assertThat(r.getDecidedAt() != null).isEqualTo(decided);
+        assertThat(r.getEvents()).hasSize(events);
+        assertThat(r.getEvents().get(events - 1).getType()).isEqualTo(lastEvent);
+        // INV-01: an approval stores the discount it saw; other statuses store none
+        assertThat(r.getApprovedDiscountBps()).isEqualTo(status == RequestStatus.APPROVED ? r.getDiscountBps() : null);
     }
 
     @Test
-    void seed_declined_request_has_decision_fields_and_no_approved_discount() {
-        PricingExceptionRequestEntity r = requests.findByStatus(RequestStatus.DECLINED).get(0);
-
-        assertThat(r.getDecidedBy()).isNotBlank();
-        assertThat(r.getDecidedAt()).isNotNull();
-        assertThat(r.getApprovedDiscountBps()).isNull();
-        assertThat(r.getEvents()).hasSize(2);
-        assertThat(r.getEvents().get(1).getType()).isEqualTo(RequestEvent.Type.DECLINED);
-    }
-
-    @Test
-    void seed_pending_request_has_no_decision_fields() {
-        PricingExceptionRequestEntity r = requests.findByStatus(RequestStatus.PENDING).get(0);
-
-        assertThat(r.getDecidedBy()).isNull();
-        assertThat(r.getDecidedAt()).isNull();
-        assertThat(r.getApprovedDiscountBps()).isNull();
-        assertThat(r.getEvents()).hasSize(1);
-    }
-
-    @Test
-    void INV04_seed_active_requests_have_activeApplicationId_and_declined_has_none() {
+    void INV04_seed_active_requests_have_activeApplicationId_and_at_most_one_per_application() {
         for (PricingExceptionRequestEntity r : requests.findAll()) {
-            if (r.getStatus().isActive()) {
-                assertThat(r.getActiveApplicationId()).isEqualTo(r.getApplicationId());
-            } else {
-                assertThat(r.getActiveApplicationId()).isNull();
-            }
+            assertThat(r.getActiveApplicationId()).isEqualTo(r.getStatus().isActive() ? r.getApplicationId() : null);
         }
-    }
-
-    @Test
-    void INV04_seed_has_at_most_one_active_request_per_application() {
-        Map<String, Long> active = requests.findAll().stream()
-                .filter(r -> r.getStatus().isActive())
-                .collect(Collectors.groupingBy(PricingExceptionRequestEntity::getApplicationId,
-                        Collectors.counting()));
-
+        Map<String, Long> active = requests.findAll().stream().filter(r -> r.getStatus().isActive())
+                .collect(Collectors.groupingBy(PricingExceptionRequestEntity::getApplicationId, Collectors.counting()));
         assertThat(active.values()).allMatch(c -> c == 1L);
     }
 }

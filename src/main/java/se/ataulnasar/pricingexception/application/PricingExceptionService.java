@@ -60,8 +60,7 @@ public class PricingExceptionService {
 
         requireOpen(loadApplication(applicationId));
         requests.findByActiveApplicationId(applicationId).ifPresent(active -> {
-            throw new ConflictException(ConflictException.ACTIVE_REQUEST_EXISTS,
-                    "application " + applicationId + " already has an active request " + active.getId());
+            throw ApiProblem.activeRequestExists(applicationId, active.getId());
         });
 
         PricingExceptionRequestEntity saved = requests.saveAndFlush(mapper.toNewEntity(request));
@@ -177,8 +176,7 @@ public class PricingExceptionService {
         loadApplication(applicationId);
         PricingExceptionRequestEntity approved = requests.findByApplicationIdAndStatus(applicationId, RequestStatus.APPROVED)
                 .stream().findFirst()
-                .orElseThrow(() -> new NotFoundException(NotFoundException.NO_APPROVED_DISCOUNT,
-                        "mortgage application " + applicationId + " has no approved pricing exception"));
+                .orElseThrow(() -> ApiProblem.noApprovedDiscount(applicationId));
         return new ApprovedDiscount(applicationId, approved.getApprovedDiscountBps(), approved.getId(),
                 approved.getDecidedBy(), approved.getDecidedAt());
     }
@@ -199,25 +197,22 @@ public class PricingExceptionService {
     }
 
     private PricingExceptionRequestEntity load(UUID id) {
-        return requests.findById(id).orElseThrow(() -> new NotFoundException(
-                NotFoundException.REQUEST_NOT_FOUND, "pricing exception request " + id + " not found"));
+        return requests.findById(id).orElseThrow(() -> ApiProblem.requestNotFound(id));
     }
 
     private MortgageApplicationEntity loadApplication(String applicationId) {
-        return applications.findById(applicationId).orElseThrow(() -> new NotFoundException(
-                NotFoundException.APPLICATION_NOT_FOUND, "mortgage application " + applicationId + " not found"));
+        return applications.findById(applicationId).orElseThrow(() -> ApiProblem.applicationNotFound(applicationId));
     }
 
     private static void requireOpen(MortgageApplicationEntity application) {
         if (application.getStatus() != ApplicationStatus.OPEN) {
-            throw new ConflictException(ConflictException.APPLICATION_NOT_OPEN,
-                    "mortgage application " + application.getId() + " is " + application.getStatus());
+            throw ApiProblem.applicationNotOpen(application.getId(), application.getStatus());
         }
     }
 
     private static void requireVersion(PricingExceptionRequestEntity entity, long expectedVersion) {
         if (entity.getVersion() != expectedVersion) {
-            throw new VersionMismatchException(expectedVersion, entity.getVersion());
+            throw ApiProblem.versionMismatch(expectedVersion, entity.getVersion());
         }
     }
 }

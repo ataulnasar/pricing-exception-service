@@ -44,3 +44,6 @@ jobs:
 
       - name: Unit tests of the AI review agent (standard library only, no API key needed)
         run: python3 -m unittest discover -s agents/tests -v
+
+      - name: Every eval patch still applies to the current code (they break after a refactor)
+        run: for p in agents/eval/*.patch; do git apply --check "$p" || { echo "$p no longer applies; regenerate it"; exit 1; }; done

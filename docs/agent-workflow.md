@@ -226,3 +226,124 @@ Check the current Anthropic API docs for the request format — do not guess.
 - [ ] `docs/ai-usage.md` complete — include one case where an agent was wrong and how you saw it
 - [ ] Tag: `git tag v1.0 && git push --tags`
 - [ ] Practise a 10-minute demo: decision (2 min) → live demo (4) → tests (2) → AI agents (2)
+
+---
+
+## Phase 10 — Cleanup: simpler code, same behaviour
+
+Work on the branch `cleanup`. Goal: less code that is easier to read and maintain,
+with **exactly the same behaviour**. The existing tests are the safety net.
+
+**0. Measure before** (put the numbers in the final report)
+- lines of code: `src/main`, `src/test`, `src/main/resources/static`, `agents/` (Python)
+- test count from `./mvnw verify` and from the Python tests
+- the list of test names referenced in `docs/invariants.yaml`, `docs/requirements.md` and the README
+
+**1. Production code first — do not touch any test in this step**
+```
+Simplify src/main without changing behaviour:
+- remove dead code: unused classes, methods, fields, parameters, constants, config
+- merge tiny classes or wrappers that add no meaning (only when it makes the code easier
+  to follow, not just shorter); remove needless indirection and duplicated logic
+- shorten long methods; clear names; short comments only where the "why" is not obvious
+Behaviour must stay identical: HTTP status codes, error codes, headers (ETag, Location,
+Idempotent-Replayed), JSON fields, SQL schema, check order, transactions.
+Do not edit existing Flyway migrations. Do not add dependencies.
+Run ./mvnw verify after each larger change. All tests must stay green WITHOUT changing them.
+```
+Commit → `refactor: simplify production code`
+
+**2. Tests — merge, do not lose coverage**
+```
+Use the test-writer agent:
+- merge each *AttackIT / *AttackTest into the main test class of the same topic
+- remove a test only when another test checks the same behaviour; list every removed
+  test with the test that still covers it
+- share setup helpers instead of copying them; keep test names that say the rule (INVxx_...)
+- every invariant INV-01..06 and every requirement R1..R7 keeps at least one test
+- concurrency tests stay; run them 5 times in a row
+Update test names in docs/invariants.yaml (names only), docs/requirements.md and the README table.
+```
+Commit → `test: merge overlapping tests`
+
+**3. Python and UI**
+```
+Simplify agents/review.py, agents/ask.py and src/main/resources/static/app.js without
+changing behaviour. Merge agents/tests/test_review_attack.py into test_review.py the same
+way as step 2. All Python and UI tests stay green.
+```
+Commit → `refactor: simplify review agent, project guide and UI`
+
+**4. Review and docs**
+- Use the **reviewer** agent on the whole branch diff (`git diff main...cleanup`). Check:
+  behaviour unchanged, no rule lost a test, nothing removed that the docs still mention.
+- Update class names in `docs/diagrams/architecture.md`, `docs/how-to-change.md`,
+  `docs/design.md` if they changed. Add one line to `docs/ai-usage.md`.
+- Commit → `docs: update after cleanup`
+
+**5. Pull request** — push the branch and open a PR to `main` with a before/after table
+(lines and test counts), the list of removed tests and their replacements, and CI green.
+
+**Stop and ask me** if a simplification would change behaviour, an API, the schema, or a business rule.
+
+**Done when:** CI is green on the PR, every INV and R row still has a test, and I have
+done one manual click-through of the UI on the branch.
+
+---
+
+## Phase 11 — Deeper compression (same branch `cleanup`)
+
+Goal: about **−10 to −15 % production code** and **−30 to −40 % test code**, with the
+**same behaviour** and **the same rule coverage**. Same rules as Phase 10: no change to
+HTTP status, error codes, headers, JSON fields, schema or check order; no new dependency;
+stop and ask before any behaviour change.
+
+**0. Measure before** (lines and test counts, as in Phase 10).
+
+**1. Production code — tests unchanged in this step**
+```
+- Replace the small "status + code" exceptions in application and api
+  (NotFoundException, ConflictException, VersionMismatchException,
+  IdempotencyInProgressException, IdempotencyKeyReusedException,
+  IfMatchRequiredException, MalformedRequestException, UnauthenticatedException)
+  with ONE class, e.g. ApiProblem(HttpStatus status, String code, String message),
+  plus static factory methods with clear names. Keep the domain exceptions as they are.
+  Shrink ApiExceptionHandler to match.
+- Merge record classes in application that only copy each other (commands, views,
+  results). Keep one clear type per concept.
+- Remove getters, setters and constructors in the JPA entities that nothing uses.
+  Use a record for IdempotencyRecordId only if Hibernate in this Spring Boot version
+  supports it — check, do not guess.
+- Keep IdempotencyTransactions separate if it exists so @Transactional works through a
+  Spring proxy; say so in a one-line comment.
+Run ./mvnw verify after each change. All existing tests must stay green WITHOUT edits.
+```
+Commit → `refactor: one ApiProblem type, fewer records, slimmer entities`
+
+**2. Tests — compress, keep every case**
+```
+Use the test-writer agent:
+- one shared test helper for HTTP calls in the IT classes (create, get, decide,
+  withdraw, supersede, with headers), instead of a copy in each class
+- turn groups of near-identical error tests into @ParameterizedTest tables
+  (one row per case: caller, call, expected status, expected code)
+- PricingExceptionControllerTest: keep only cases an IT cannot check (for example
+  "decidedBy in the body is ignored", malformed JSON, strict number parsing).
+  Remove a case only when an IT asserts the same status AND code; list each one.
+- keep the INVxx_ names that docs/invariants.yaml, docs/requirements.md and the README
+  quote, or update those docs (names only)
+- every INV-01..06 and R1..R7 keeps at least one test; concurrency tests run 5 times
+Write a table: removed or merged test → where it is covered now.
+```
+Commit → `test: shared helpers and table-driven tests`
+
+**3. Review** — the **reviewer** agent on `git diff main...cleanup`: behaviour unchanged,
+no rule lost coverage, docs still match class names (`docs/diagrams/architecture.md`,
+`docs/how-to-change.md`, `docs/design.md`). Fix, add one line to `docs/ai-usage.md`.
+Commit → `docs: update after compression`
+
+**4. Update PR #1** — push, and add the new before/after table and the test mapping
+table to the PR description. Do not merge.
+
+**Done when:** CI is green on the PR, the targets are reached (or the report explains
+why a part could not shrink safely), and I have done one manual UI click-through.

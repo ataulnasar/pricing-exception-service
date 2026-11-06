@@ -15,16 +15,12 @@ import se.ataulnasar.pricingexception.domain.RequestStatus;
  */
 public interface PricingExceptionRequestRepository extends Repository<PricingExceptionRequestEntity, UUID> {
 
-    PricingExceptionRequestEntity save(PricingExceptionRequestEntity entity);
-
     PricingExceptionRequestEntity saveAndFlush(PricingExceptionRequestEntity entity);
 
     void flush();
 
     @EntityGraph(attributePaths = "events")
     Optional<PricingExceptionRequestEntity> findById(UUID id);
-
-    boolean existsById(UUID id);
 
     @EntityGraph(attributePaths = "events")
     List<PricingExceptionRequestEntity> findAll();

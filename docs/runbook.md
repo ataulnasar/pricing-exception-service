@@ -17,7 +17,7 @@ adds `application-postgres.properties` on top of it.
 | `spring.jpa.hibernate.ddl-auto` | `validate` | Hibernate checks the entities against the schema. It never changes the schema. |
 | `spring.jpa.open-in-view` | `false` | Services load what they need inside their transaction. |
 | `spring.h2.console.enabled` | `true` | The H2 console is at `/h2-console`. |
-| `spring.jackson.deserialization.accept-float-as-int` | `false` | JSON numbers must be whole. `40.0` gets `400 MALFORMED_REQUEST`. Strings such as `"40"` are rejected too (see `AppConfig`). |
+| `spring.jackson.deserialization.accept-float-as-int` | `false` | JSON numbers must be whole. `40.0` gets `400 MALFORMED_REQUEST`. Strings such as `"40"` are rejected too (see the `strictIntegers` bean in `PricingExceptionServiceApplication`). |
 | `pricing.max-discount-bps` | `100` | The largest allowed `discountBps`. The smallest is 1. |
 | `pricing.idempotency.ttl` | `PT24H` | How long a stored `Idempotency-Key` response can be replayed. |
 | `pricing.idempotency.purge-interval` | `PT1H` | How often expired records are removed. The first run is one interval after start. |

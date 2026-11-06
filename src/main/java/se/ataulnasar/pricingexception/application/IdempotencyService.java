@@ -65,17 +65,17 @@ public class IdempotencyService {
         } catch (PessimisticLockingFailureException | QueryTimeoutException e) {
             // Timed out waiting for the claim's lock: the first request with this key is still running.
             return awaitWinner(callerId, key, LOCK_WAIT).map(w -> replay(w, hash, key))
-                    .orElseThrow(() -> new IdempotencyInProgressException(key));
+                    .orElseThrow(() -> ApiProblem.idempotencyInProgress(key));
         }
     }
 
     private IdempotentResult replay(IdempotencyRecordEntity record, String hash, String key) {
         if (!record.getRequestHash().equals(hash)) {
-            throw new IdempotencyKeyReusedException(key);
+            throw ApiProblem.idempotencyKeyReused(key);
         }
         if (record.getResponseStatus() == IdempotencyRecordEntity.IN_PROGRESS) {
             // Defensive: a claim is completed in its own transaction, so this is never committed.
-            throw new IdempotencyInProgressException(key);
+            throw ApiProblem.idempotencyInProgress(key);
         }
         JsonNode body = json.readTree(record.getResponseBody());
         return new IdempotentResult(record.getResponseStatus(), record.getResponseBody(),

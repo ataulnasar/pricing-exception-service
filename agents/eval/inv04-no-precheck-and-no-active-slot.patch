@@ -1,14 +1,13 @@
 diff --git a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
-index dc165d7..8fc051a 100644
+index 0be7ec6..422dba3 100644
 --- a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
 +++ b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
-@@ -59,10 +59,6 @@ public class PricingExceptionService {
+@@ -59,9 +59,6 @@ public class PricingExceptionService {
                  DiscountBps.of(discountBps, properties.maxDiscountBps()), new Reason(reason), null, clock);
  
          requireOpen(loadApplication(applicationId));
 -        requests.findByActiveApplicationId(applicationId).ifPresent(active -> {
--            throw new ConflictException(ConflictException.ACTIVE_REQUEST_EXISTS,
--                    "application " + applicationId + " already has an active request " + active.getId());
+-            throw ApiProblem.activeRequestExists(applicationId, active.getId());
 -        });
  
          PricingExceptionRequestEntity saved = requests.saveAndFlush(mapper.toNewEntity(request));

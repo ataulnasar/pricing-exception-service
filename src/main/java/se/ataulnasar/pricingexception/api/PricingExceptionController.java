@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import se.ataulnasar.pricingexception.application.ApiProblem;
 import se.ataulnasar.pricingexception.application.CreateRequestCommand;
 import se.ataulnasar.pricingexception.application.IdempotentResult;
 import se.ataulnasar.pricingexception.application.PricingExceptionService;
@@ -55,10 +56,7 @@ public class PricingExceptionController {
                                     @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey,
                                     @Valid @RequestBody CreateRequestBody body) {
         if (idempotencyKey == null) {
-            RequestView view = service.create(caller, body.applicationId(), body.discountBps(), body.reason());
-            return ResponseEntity.created(location(view.request().id()))
-                    .eTag(etag(view))
-                    .body(PricingExceptionResponse.from(view));
+            return created(service.create(caller, body.applicationId(), body.discountBps(), body.reason()));
         }
         String key = requireValidKey(idempotencyKey);
         IdempotentResult result = service.createIdempotently(caller, key,
@@ -70,7 +68,7 @@ public class PricingExceptionController {
     private static String requireValidKey(String idempotencyKey) {
         String key = idempotencyKey.trim();
         if (key.isEmpty() || key.length() > MAX_KEY_LENGTH) {
-            throw new MalformedRequestException(IDEMPOTENCY_KEY + " must be 1 to " + MAX_KEY_LENGTH + " characters");
+            throw ApiProblem.malformedRequest(IDEMPOTENCY_KEY + " must be 1 to " + MAX_KEY_LENGTH + " characters");
         }
         return key;
     }
@@ -79,7 +77,7 @@ public class PricingExceptionController {
     private static ResponseEntity<String> replayable(IdempotentResult result) {
         ResponseEntity.BodyBuilder response = ResponseEntity.status(result.status())
                 .location(location(result.requestId()))
-                .eTag("\"" + result.version() + "\"")
+                .eTag(etag(result.version()))
                 .contentType(MediaType.APPLICATION_JSON);
         if (result.replayed()) {
             response.header(IDEMPOTENT_REPLAYED, "true");
@@ -128,10 +126,7 @@ public class PricingExceptionController {
                                        @Valid @RequestBody SupersedeBody body) {
         long expectedVersion = IfMatch.requiredVersion(ifMatch);
         if (idempotencyKey == null) {
-            RequestView view = service.supersede(caller, id, expectedVersion, body.discountBps(), body.reason());
-            return ResponseEntity.created(location(view.request().id()))
-                    .eTag(etag(view))
-                    .body(PricingExceptionResponse.from(view));
+            return created(service.supersede(caller, id, expectedVersion, body.discountBps(), body.reason()));
         }
         String key = requireValidKey(idempotencyKey);
         IdempotentResult result = service.supersedeIdempotently(caller, key,
@@ -140,15 +135,21 @@ public class PricingExceptionController {
         return replayable(result);
     }
 
+    private static ResponseEntity<PricingExceptionResponse> created(RequestView view) {
+        return ResponseEntity.created(location(view.request().id()))
+                .eTag(etag(view.version()))
+                .body(PricingExceptionResponse.from(view));
+    }
+
     private static ResponseEntity<PricingExceptionResponse> withEtag(RequestView view) {
-        return ResponseEntity.ok().eTag(etag(view)).body(PricingExceptionResponse.from(view));
+        return ResponseEntity.ok().eTag(etag(view.version())).body(PricingExceptionResponse.from(view));
     }
 
     private static URI location(UUID id) {
         return URI.create(BASE_PATH + "/" + id);
     }
 
-    private static String etag(RequestView view) {
-        return "\"" + view.version() + "\"";
+    private static String etag(long version) {
+        return "\"" + version + "\"";
     }
 }

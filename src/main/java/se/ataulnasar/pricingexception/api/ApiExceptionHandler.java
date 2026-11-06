@@ -12,17 +12,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.validation.FieldError;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import se.ataulnasar.pricingexception.application.ConflictException;
-import se.ataulnasar.pricingexception.application.IdempotencyInProgressException;
-import se.ataulnasar.pricingexception.application.IdempotencyKeyReusedException;
-import se.ataulnasar.pricingexception.application.NotFoundException;
-import se.ataulnasar.pricingexception.application.VersionMismatchException;
+import se.ataulnasar.pricingexception.application.ApiProblem;
 import se.ataulnasar.pricingexception.domain.DomainException;
 import se.ataulnasar.pricingexception.domain.ForbiddenActionException;
 import se.ataulnasar.pricingexception.domain.InvalidTransitionException;
@@ -46,9 +41,9 @@ public class ApiExceptionHandler {
     public record FieldViolation(String field, String message) {
     }
 
-    @ExceptionHandler(UnauthenticatedException.class)
-    ProblemDetail unauthenticated(UnauthenticatedException e) {
-        return problem(HttpStatus.UNAUTHORIZED, e);
+    @ExceptionHandler(ApiProblem.class)
+    ProblemDetail apiProblem(ApiProblem e) {
+        return problem(e.status(), e.code(), e.getMessage());
     }
 
     @ExceptionHandler(ForbiddenActionException.class)
@@ -56,40 +51,20 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, e);
     }
 
-    @ExceptionHandler(NotFoundException.class)
-    ProblemDetail notFound(NotFoundException e) {
-        return problem(HttpStatus.NOT_FOUND, e);
-    }
-
-    @ExceptionHandler({ConflictException.class, InvalidTransitionException.class, IdempotencyInProgressException.class})
-    ProblemDetail conflict(DomainException e) {
+    @ExceptionHandler(InvalidTransitionException.class)
+    ProblemDetail invalidTransition(InvalidTransitionException e) {
         return problem(HttpStatus.CONFLICT, e);
     }
 
-    @ExceptionHandler(VersionMismatchException.class)
-    ProblemDetail versionMismatch(VersionMismatchException e) {
-        return problem(HttpStatus.PRECONDITION_FAILED, e);
-    }
-
-    @ExceptionHandler(IfMatchRequiredException.class)
-    ProblemDetail ifMatchRequired(IfMatchRequiredException e) {
-        return problem(HttpStatus.PRECONDITION_REQUIRED, e);
-    }
-
-    @ExceptionHandler({ValidationException.class, IdempotencyKeyReusedException.class})
-    ProblemDetail domainValidation(DomainException e) {
+    @ExceptionHandler(ValidationException.class)
+    ProblemDetail domainValidation(ValidationException e) {
         return problem(HttpStatus.UNPROCESSABLE_CONTENT, e);
-    }
-
-    @ExceptionHandler(MalformedRequestException.class)
-    ProblemDetail malformed(MalformedRequestException e) {
-        return problem(HttpStatus.BAD_REQUEST, e);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail beanValidation(MethodArgumentNotValidException e) {
         List<FieldViolation> errors = e.getBindingResult().getFieldErrors().stream()
-                .map(f -> new FieldViolation(f.getField(), message(f)))
+                .map(f -> new FieldViolation(f.getField(), f.getDefaultMessage() == null ? "invalid" : f.getDefaultMessage()))
                 .toList();
         ProblemDetail problem = problem(HttpStatus.UNPROCESSABLE_CONTENT, VALIDATION_FAILED,
                 "request body is not valid");
@@ -99,7 +74,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
     ProblemDetail unreadable(Exception e) {
-        return problem(HttpStatus.BAD_REQUEST, MalformedRequestException.CODE, "request could not be read");
+        return problem(HttpStatus.BAD_REQUEST, ApiProblem.MALFORMED_REQUEST, "request could not be read");
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
@@ -112,7 +87,7 @@ public class ApiExceptionHandler {
     ProblemDetail dataIntegrity(DataIntegrityViolationException e) {
         String message = String.valueOf(e.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT);
         if (message.contains("ux_per_active_application")) {
-            return problem(HttpStatus.CONFLICT, ConflictException.ACTIVE_REQUEST_EXISTS,
+            return problem(HttpStatus.CONFLICT, ApiProblem.ACTIVE_REQUEST_EXISTS,
                     "the application already has an active request");
         }
         log.warn("data integrity violation", e);
@@ -142,9 +117,5 @@ public class ApiExceptionHandler {
         problem.setTitle(status.getReasonPhrase());
         problem.setProperty("code", code);
         return problem;
-    }
-
-    private static String message(FieldError f) {
-        return f.getDefaultMessage() == null ? "invalid" : f.getDefaultMessage();
     }
 }

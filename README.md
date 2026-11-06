@@ -186,7 +186,7 @@ One main test per requirement. The full list, with the deliverables and constrai
 | ID | Requirement | Main test |
 |---|---|---|
 | R1 | An RM creates a request for an existing application, with a discount in bps and a reason. | `WorkflowIT.INV02_each_transition_writes_one_event` |
-| R2 | A reviewer approves or declines. The outcome shows who decided and when. | `ApiAttackIT.INV02_decline_gives_etag_1_two_events_microsecond_decidedAt_and_final_state_rejects_everything` |
+| R2 | A reviewer approves or declines. The outcome shows who decided and when. | `WorkflowIT.INV02_decline_gives_etag_1_two_events_microsecond_decidedAt_and_final_state_rejects_everything` |
 | R3 | An approved request is available to the mortgage application process. | `SupersedeIT.approved_discount_lifecycle_404_before_200_after` |
 | R4 | Internal users can see the history of a request: current status and earlier decisions. | `WithdrawalIT.INV02_get_after_approval_shows_full_history_in_order` |
 | R5 | No duplicate requests when an upstream system retries after a timeout. | `ConcurrencyIT.idempotent_parallel_creates_with_same_key_create_one_request_and_all_return_same_id` |

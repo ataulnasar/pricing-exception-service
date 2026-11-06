@@ -2,7 +2,7 @@
 
 Live AI eval not run: it needs an Anthropic API key. The Java tests catch all 6 seeded bugs (see the table). To run it: export ANTHROPIC_API_KEY and run agents/eval/run.sh.
 
-Java tests run on 2026-11-05 (listed classes per case, each patch applied in a scratch worktree):
+Java tests run on 2026-11-06 after the Phase 10 and 11 cleanup (462 tests; listed classes per case, each patch applied in a scratch worktree):
 
 | case | expected | tests caught it? |
 |---|---|---|

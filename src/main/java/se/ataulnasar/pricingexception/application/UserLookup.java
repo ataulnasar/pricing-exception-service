@@ -18,9 +18,6 @@ public class UserLookup {
 
     @Transactional(readOnly = true)
     public Optional<Actor> findActor(String userId) {
-        if (userId == null || userId.isBlank()) {
-            return Optional.empty();
-        }
         return users.findById(userId).map(u -> new Actor(
                 u.getId(), u.getRole(), u.getApprovalLimitBps() == null ? 0 : u.getApprovalLimitBps()));
     }
