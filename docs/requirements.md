@@ -25,10 +25,10 @@ The `Proved by` column lists the tests or documents that show each requirement i
 | ID | Deliverable | Where | Done |
 |---|---|---|---|
 | D1 | Working, runnable solution; HTTP API expected | the app | ✅ `./mvnw spring-boot:run`; HTTP API in docs/design.md; CI green on every push |
-| D2 | Seed data or setup steps to try a realistic workflow | seed migration, README walkthrough, UI | ✅ seed: `src/main/resources/db/seed/V1000__local_seed_data.sql`; walkthrough: README "Demo walkthrough", the UI and Swagger UI; the full scenario runs in `WorkflowIT` |
+| D2 | Seed data or setup steps to try a realistic workflow | seed migration, README demo, UI | ✅ seed: `src/main/resources/db/seed/V1000__local_seed_data.sql`; walkthrough: README "Three-minute demo", the UI and Swagger UI; the full scenario runs in `WorkflowIT` |
 | D3 | Source in Git, with instructions to run, test and explore | GitHub repo, README | ✅ github.com/ataulnasar/pricing-exception-service; `README.md` quick start; `docs/runbook.md` |
 | D4 | Short README: the problem, assumptions, scope choices | `README.md` | ✅ `README.md` |
-| D5 | Evidence that important behaviour is tested | test suite, README "requirement → test" table | ✅ 477 tests in `./mvnw verify` incl. Postgres (CI); 58 Python tests (review agent and project guide); this file; README "Requirement → test" |
+| D5 | Evidence that important behaviour is tested | test suite, the `Proved by` column above | ✅ 477 tests in `./mvnw verify` incl. Postgres (CI); 58 Python tests (review agent and project guide); this file; README "Requirement → test" |
 | D6 | Decisions, diagrams, notes and operational guidance for the next engineer | `docs/adr/`, `docs/diagrams/`, `docs/runbook.md` | ✅ `docs/adr/ADR-001..006`, `docs/diagrams/` (state machine, architecture, development flow), `docs/runbook.md`, `docs/design.md`, `docs/invariants.yaml` |
 
 ## Constraints
@@ -44,7 +44,7 @@ The `Proved by` column lists the tests or documents that show each requirement i
 
 | ID | Bonus | Where | Done |
 |---|---|---|---|
-| B1 | Show how AI agents can improve the solution or the SDLC: the problem, how output is controlled and checked, remaining risks | Phase 8: CI review agent + eval | built; live eval not run (needs API key): `agents/review.py`, `agents/review-prompt.md`, `agents/finding.schema.json`, `.github/workflows/ai-review.yml`, `agents/eval/` (`results.md` shows the Java-test side), `agents/tests/`, README "AI review agent in CI" |
+| B1 | Show how AI agents can improve the solution or the SDLC: the problem, how output is controlled and checked, remaining risks | Phase 8: CI review agent + eval | built; live eval not run (needs API key): `agents/review.py`, `agents/review-prompt.md`, `agents/finding.schema.json`, `.github/workflows/ai-review.yml`, `agents/eval/` (`results.md` shows the Java-test side), `agents/tests/`, `docs/ai-review-agent.md` |
 | B2 | A simple UI to create, review and inspect requests | Phase 7 | ✅ `src/main/resources/static/` (index.html, app.js); tests StaticUiIT, UiSourceRulesTest, UiFirstLoadIT |
 
 ## Submission

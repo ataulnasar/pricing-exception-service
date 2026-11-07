@@ -34,8 +34,14 @@ Missing or unknown `X-User-Id` → 401.
 
 ## Mortgage applications (seed data)
 Fields: `id` (e.g. `MA-1001`), `customerRef`, `standardRateBps`, `status` (OPEN / CLOSED), `ownerRmId`.
-Seed 4 applications, one of them CLOSED. Also seed one APPROVED, one PENDING and one
-DECLINED request, each with its events.
+The seed (`src/main/resources/db/seed/V1000__local_seed_data.sql`, default profile only):
+
+| id | customer | standard rate (bps) | status | owner RM | requests in the seed |
+|---|---|---|---|---|---|
+| `MA-1001` | `CUST-0001` | 425 | OPEN | `rm-anna` | APPROVED, 30 bps (`00000000-0000-0000-0000-000000000001`) |
+| `MA-1002` | `CUST-0002` | 410 | OPEN | `rm-anna` | PENDING, 80 bps (`00000000-0000-0000-0000-000000000002`) |
+| `MA-1003` | `CUST-0003` | 450 | OPEN | `rm-erik` | DECLINED, 60 bps (`00000000-0000-0000-0000-000000000003`) |
+| `MA-1004` | `CUST-0004` | 395 | CLOSED | `rm-erik` | none |
 
 ## Request statuses
 - PENDING → APPROVED (reviewer), DECLINED (reviewer), WITHDRAWN (owner RM), SUPERSEDED (owner RM)
