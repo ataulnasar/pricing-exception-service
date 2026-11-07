@@ -12,7 +12,7 @@ each phase: [../ai-usage.md](../ai-usage.md).
 | Implementer | main Claude Code session | `src/main/` | Opus |
 | test-writer | agent in `.claude/agents/` | `src/test/` only | Sonnet |
 | reviewer | agent in `.claude/agents/` | nothing (read only) | Sonnet |
-| docs-writer | agent in `.claude/agents/` | `README.md`, `docs/`, `http/`, `scripts/` | Haiku |
+| docs-writer | agent in `.claude/agents/` | `README.md`, `docs/` | Haiku |
 | project-guide | agent in `.claude/agents/` (`/ask`), also a CLI `agents/ask.py` | nothing (read only) | Sonnet |
 
 Agents are split by **what they may see and change**, not by job title. The checking agents

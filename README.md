@@ -28,13 +28,10 @@ profile needs a PostgreSQL database; see [docs/runbook.md](docs/runbook.md).
 ```bash
 ./mvnw verify
 ./mvnw spring-boot:run
-scripts/demo.sh
 ```
 
 1. `./mvnw verify` builds the project and runs all tests.
 2. `./mvnw spring-boot:run` starts the app on port 8080 with H2 and seed data. Leave it running.
-3. In a second terminal, `scripts/demo.sh` runs the full scenario. It needs `curl`, `jq` and the
-   app running.
 
 While the app runs:
 
@@ -48,8 +45,8 @@ While the app runs:
 
 ## Demo walkthrough
 
-The scenario below is in `http/requests.http` (for the IntelliJ or VS Code REST client) and in
-`scripts/demo.sh` (curl and jq). Every call needs the `X-User-Id` header with a seeded user.
+Every call needs the `X-User-Id` header with a seeded user. The same scenario can be clicked
+through in the UI at http://localhost:8080 or sent from the Swagger UI.
 
 Try one call by hand:
 
@@ -78,10 +75,7 @@ curl -s -H "X-User-Id: rm-erik" http://localhost:8080/api/applications
    - a withdrawal with a stale `If-Match` gives `412 VERSION_MISMATCH`;
    - a reviewer who tries to create a request gives `403 WRONG_ROLE`.
 
-`scripts/demo.sh` runs steps 1 to 7 and prints each HTTP status. It ends with a summary line. Run
-it once after a fresh start. A second run on the same data gets `409 ACTIVE_REQUEST_EXISTS` at
-step 1 (printed as expected), skips steps 2 to 6 because the slot is taken and the seed request is
-already superseded, and still runs the error examples in step 7.
+The same steps run automatically in `WorkflowIT` on every `./mvnw verify`.
 
 ### Seed users
 
@@ -297,5 +291,4 @@ for the agent definitions.
 - [docs/runbook.md](docs/runbook.md): configuration, health, error codes, resetting the database, logs, PostgreSQL tests.
 - [docs/requirements.md](docs/requirements.md): the requirements and where each one is proved.
 - [docs/how-to-change.md](docs/how-to-change.md): golden rules, where things live, and recipes for common changes.
-- [http/requests.http](http/requests.http): the HTTP walkthrough.
 - OpenAPI: the app serves `/v3/api-docs` and a Swagger UI at `/swagger-ui/index.html` (springdoc). Send the `X-User-Id` header when you try calls from it.

@@ -68,7 +68,7 @@ Read this before you change anything. The project guide (`/ask` in Claude Code, 
 1. Write a `@WebMvcTest` (status codes, ProblemDetail `code`, 401 without `X-User-Id`) and an IT.
 2. Controller calls a service, never a repository (ArchUnit enforces this).
 3. Writes need `If-Match`; creates should accept `Idempotency-Key`.
-4. Add it to `docs/design.md`, `http/requests.http` and, if useful, `scripts/demo.sh`.
+4. Add it to `docs/design.md`.
 
 ### Change the database
 1. New file `V<n>__short_name.sql` in `db/migration`, portable SQL for H2 and PostgreSQL.

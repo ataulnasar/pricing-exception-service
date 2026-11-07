@@ -8,7 +8,7 @@
 | **Implementer** (main Claude Code session) | Opus | Writes the code so the tests pass | `src/main/` (+ test fixes only if you say so) |
 | **test-writer** | Sonnet | Writes tests first, later tries to break the code | `src/test/` only |
 | **reviewer** | Sonnet | Checks the change against the rules | nothing (read only) |
-| **docs-writer** | Haiku | README, ADRs, runbook; tests every command | `README.md`, `docs/`, `http/`, `scripts/` |
+| **docs-writer** | Haiku | README, ADRs, runbook; tests every command | `README.md`, `docs/` |
 
 Why different models: the agent that checks the code should not be the same model
 that wrote it. A cheap model is enough for docs.
@@ -220,7 +220,7 @@ Check the current Anthropic API docs for the request format — do not guess.
 
 ## Phase 9 — Final check and submit
 
-- [ ] Fresh clone in a new folder → `./mvnw verify` → `./mvnw spring-boot:run` → `scripts/demo.sh`
+- [ ] Fresh clone in a new folder → `./mvnw verify` → `./mvnw spring-boot:run` → click through the UI
 - [ ] No secrets in the repo (search for "key", "token", "sk-")
 - [ ] Time spent written in README
 - [ ] `docs/ai-usage.md` complete — include one case where an agent was wrong and how you saw it
