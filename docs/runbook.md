@@ -132,7 +132,7 @@ times out, also set the VM address as the host:
 export TESTCONTAINERS_HOST_OVERRIDE="$(colima ls -j | jq -r '.address')"
 ```
 
-Check it worked: the report `target/surefire-reports/TEST-se.ataulnasar.pricingexception.persistence.PostgresMigrationTest.xml`
+Check it worked: the report `target/surefire-reports/TEST-se.ataulnasar.pricingexception.repository.PostgresMigrationTest.xml`
 must contain `skipped="0"`.
 
 Only the default `colima` profile is covered above. For another profile, replace `default` in
@@ -144,4 +144,19 @@ refers to a machine-specific path.
 - Enum CHECK constraints were removed because of H2 2.4.240 bug
   https://github.com/h2database/h2database/issues/4342 (duplicate of #4291, fixed upstream,
   waiting for a release). Add them back in a new migration when Spring Boot ships a fixed H2
-  version. The domain still enforces valid statuses.
+  version. The service and the JPA enum mapping still enforce valid statuses.
+
+## Open notes before production
+
+Reviewer notes from phases 3 to 5 that were accepted as known and left as they are:
+
+- The `ACTIVE_REQUEST_EXISTS` mapping finds the unique index by its name in the database error
+  message. That text depends on the driver.
+- The approved discount column is nullable in the database. Only the service guarantees a value
+  for APPROVED rows. Consider a CHECK or NOT NULL rule.
+- The approved-discount and `supersededById` lookups load the full event history. They need one
+  column. Use projections.
+- `idempotency_record.created_at` has no index for the hourly purge.
+- The stored idempotency response fits `VARCHAR(16000)` only because a fresh create has one event
+  and no comment.
+- The list endpoint sorts in memory and has no paging.

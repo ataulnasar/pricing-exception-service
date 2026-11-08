@@ -12,23 +12,23 @@ The `Proved by` column lists the tests or documents that show each requirement i
 | R3 | An approved request is available to the mortgage application process, which needs the approved discount. | `GET /api/applications/{id}/approved-discount` | SupersedeIT.approved_discount_lifecycle_404_before_200_after; SupersedeIT.approved_discount_other_roles_are_403_WRONG_ROLE; SupersedeIT.INV01_chain_approving_the_last_replacement_gives_its_discount_to_the_mortgage_process; ApplicationControllerTest.api_approved_discount_maps_all_five_fields_and_passes_caller_and_id |
 | R4 | Internal users can see the history of a request: its current status and earlier decisions. | `GET /{id}` with `history` | WorkflowIT.INV02_each_transition_writes_one_event (GET shows SUBMITTED then APPROVED); SupersedeIT.INV01_supersede_links_old_and_new_both_ways_and_writes_both_events; SupersedeIT.INV02_a_chain_writes_exactly_one_event_per_status_change; WithdrawalIT.INV02_get_after_approval_shows_full_history_in_order |
 | R5 | No duplicate requests when an upstream system retries a call after a timeout. | `Idempotency-Key`, INV-04 | ConcurrencyIT.idempotent_parallel_creates_with_same_key_create_one_request_and_all_return_same_id; ConcurrencyIT.idempotent_replay_returns_same_status_location_etag_and_body; ConcurrencyIT.INV04_parallel_creates_without_key_create_one_request; SupersedeConcurrencyIT.idempotent_parallel_supersedes_with_same_key_create_one_request; SupersedeIT.idempotent_supersede_replays_first_response; PostgresApiIT.idempotent_parallel_creates_with_same_key_on_postgres_create_one_request_and_all_return_same_id (runs in CI; skipped locally without Docker) |
-| R6 | Easy to run locally. Mortgage applications and users may be modelled as we choose. | H2 default, seed data, `X-User-Id` | PricingExceptionServiceApplicationTests.contextLoads (H2 + Flyway + seed on start); SeedDataTest (4 applications, 5 users, 3 requests); PostgresMigrationTest (same schema on Postgres); docs/runbook.md; http/requests.http |
+| R6 | Easy to run locally. Mortgage applications and users may be modelled as we choose. | H2 default, seed data, `X-User-Id` | PricingExceptionServiceApplicationTests.contextLoads (H2 + Flyway + seed on start); SeedDataTest (4 applications, 5 users, 3 requests); PostgresMigrationTest (same schema on Postgres); docs/runbook.md |
 
 ## The stakeholder conflict
 
 | ID | Requirement | Our decision | Proved by |
 |---|---|---|---|
-| R7 | One stakeholder wants RMs to change the discount after submit. Another wants an approval to always apply to the exact request that was reviewed. Make and explain a decision. | Requests never change (INV-01). The RM supersedes a PENDING request instead. Explained in ADR-001 and the README. | PricingExceptionRequestTest.INV01_approval_records_reviewed_discount; PricingExceptionRequestTest.INV01_request_has_no_way_to_change_the_discount; SupersedeIT.INV01_only_pending_request_can_be_superseded; SupersedeIT.INV01_no_endpoint_changes_discount_after_approval; docs/design.md "Key decisions" 1; `docs/adr/ADR-001.md`; README "The stakeholder decision" |
+| R7 | One stakeholder wants RMs to change the discount after submit. Another wants an approval to always apply to the exact request that was reviewed. Make and explain a decision. | Requests never change (INV-01). The RM supersedes a PENDING request instead. Explained in ADR-001 and the README. | PricingExceptionServiceTest.INV01_approval_records_reviewed_discount; PricingExceptionServiceTest.INV01_request_has_no_way_to_change_the_discount; SupersedeIT.INV01_only_pending_request_can_be_superseded; SupersedeIT.INV01_no_endpoint_changes_discount_after_approval; docs/design.md "Key decisions" 1; `docs/adr/ADR-001.md`; README "The stakeholder decision" |
 
 ## Deliverables
 
 | ID | Deliverable | Where | Done |
 |---|---|---|---|
 | D1 | Working, runnable solution; HTTP API expected | the app | ✅ `./mvnw spring-boot:run`; HTTP API in docs/design.md; CI green on every push |
-| D2 | Seed data or setup steps to try a realistic workflow | seed migration, `http/requests.http`, `scripts/demo.sh` | ✅ seed: `src/main/resources/db/seed/V1000__local_seed_data.sql`; walkthrough: `http/requests.http`; full scenario: `scripts/demo.sh` |
+| D2 | Seed data or setup steps to try a realistic workflow | seed migration, README demo, UI | ✅ seed: `src/main/resources/db/seed/V1000__local_seed_data.sql`; walkthrough: README "Three-minute demo", the UI and Swagger UI; the full scenario runs in `WorkflowIT` |
 | D3 | Source in Git, with instructions to run, test and explore | GitHub repo, README | ✅ github.com/ataulnasar/pricing-exception-service; `README.md` quick start; `docs/runbook.md` |
 | D4 | Short README: the problem, assumptions, scope choices | `README.md` | ✅ `README.md` |
-| D5 | Evidence that important behaviour is tested | test suite, README "requirement → test" table | ✅ 462 tests in `./mvnw verify` incl. Postgres (CI); 58 Python tests (review agent and project guide); this file; README "Requirement → test" |
+| D5 | Evidence that important behaviour is tested | test suite, the `Proved by` column above | ✅ 486 tests in `./mvnw verify` incl. Postgres (CI); 58 Python tests (review agent and project guide); this file; README "Requirement → test" |
 | D6 | Decisions, diagrams, notes and operational guidance for the next engineer | `docs/adr/`, `docs/diagrams/`, `docs/runbook.md` | ✅ `docs/adr/ADR-001..006`, `docs/diagrams/` (state machine, architecture, development flow), `docs/runbook.md`, `docs/design.md`, `docs/invariants.yaml` |
 
 ## Constraints
@@ -37,14 +37,14 @@ The `Proved by` column lists the tests or documents that show each requirement i
 |---|---|---|---|
 | C1 | Any language and tools; Java or C# preferred | Java 21, Spring Boot 4 | ✅ |
 | C2 | Easy to run locally; no private infrastructure or paid services | H2 by default; Postgres optional via Docker | ✅ H2 in memory by default; Postgres only via Testcontainers / `postgres` profile (`docs/runbook.md`) |
-| C3 | Say what must change before production where we took a lighter path | README "Before production" section | ✅ README "Before production" (7 items) |
+| C3 | Say what must change before production where we took a lighter path | README "Before production" section | ✅ README "Before production" (6 items) |
 | C4 | Use agentic development where it adds value; be ready to explain how agents helped and how output was checked | `.claude/agents/`, `docs/agent-workflow.md`, `docs/ai-usage.md` | ✅ `.claude/agents/`, `.claude/commands/run-phase.md`, `docs/agent-workflow.md`, `docs/ai-usage.md` (one line per phase), `.claude/agents/project-guide.md` (/ask), `agents/ask.py` |
 
 ## Bonus
 
 | ID | Bonus | Where | Done |
 |---|---|---|---|
-| B1 | Show how AI agents can improve the solution or the SDLC: the problem, how output is controlled and checked, remaining risks | Phase 8: CI review agent + eval | built; live eval not run (needs API key): `agents/review.py`, `agents/review-prompt.md`, `agents/finding.schema.json`, `.github/workflows/ai-review.yml`, `agents/eval/` (`results.md` shows the Java-test side), `agents/tests/`, README "AI review agent in CI" |
+| B1 | Show how AI agents can improve the solution or the SDLC: the problem, how output is controlled and checked, remaining risks | Phase 8: CI review agent + eval | built; live eval not run (needs API key): `agents/review.py`, `agents/review-prompt.md`, `agents/finding.schema.json`, `.github/workflows/ai-review.yml`, `agents/eval/` (`results.md` shows the Java-test side), `agents/tests/`, `docs/ai-review-agent.md` |
 | B2 | A simple UI to create, review and inspect requests | Phase 7 | ✅ `src/main/resources/static/` (index.html, app.js); tests StaticUiIT, UiSourceRulesTest, UiFirstLoadIT |
 
 ## Submission

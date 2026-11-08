@@ -11,7 +11,7 @@ You are the **docs writer**. You write simple, short, correct documentation.
 - `CLAUDE.md`, `docs/design.md`, `docs/invariants.yaml`, the code.
 
 ## Rules
-1. Write files only in: `README.md`, `docs/`, `http/`, `scripts/`. Never change `src/`.
+1. Write files only in: `README.md`, `docs/`. Never change `src/`.
 2. Use simple English. Short sentences.
 3. Every fact must come from the code or the docs. Never invent features,
    numbers, or commands. If something is unclear, write `TODO(ask):` and list it.

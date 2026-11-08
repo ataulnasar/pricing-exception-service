@@ -1,42 +1,45 @@
-diff --git a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
-index 0be7ec6..2ac9fad 100644
---- a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
-+++ b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
-@@ -58,7 +58,7 @@ public class PricingExceptionService {
-                 UUID.randomUUID(), applicationId, caller,
-                 DiscountBps.of(discountBps, properties.maxDiscountBps()), new Reason(reason), null, clock);
+diff --git a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+index ceec19a..bac548c 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
++++ b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+@@ -80,7 +80,7 @@ public class PricingExceptionService {
+         }
+         requireRole(caller, Role.RM, "submit");
  
--        requireOpen(loadApplication(applicationId));
+-        requireOpen(lockApplication(applicationId));
 +        requireApplicationOpen(applicationId);
          requests.findByActiveApplicationId(applicationId).ifPresent(active -> {
              throw ApiProblem.activeRequestExists(applicationId, active.getId());
          });
-@@ -115,7 +115,7 @@ public class PricingExceptionService {
- 
-         if (decision == Decision.APPROVED) {
-             request.approve(caller, comment, clock);
--            requireOpen(loadApplication(entity.getApplicationId())); // INV-06, after the domain checks
-+            requireApplicationOpen(entity.getApplicationId()); // INV-06, after the domain checks
+@@ -163,7 +163,7 @@ public class PricingExceptionService {
+                                 + "'s approval limit of " + caller.approvalLimitBps() + " bps");
+             }
+             requireValidComment(comment);
+-            requireOpen(lockApplication(entity.getApplicationId())); // INV-06, after the business checks
++            requireApplicationOpen(entity.getApplicationId()); // INV-06, after the business checks
+             entity.setApprovedDiscountBps(entity.getDiscountBps());  // INV-01: the discount the reviewer saw
+             recordDecision(entity, RequestStatus.APPROVED, EventType.APPROVED, caller, comment);
          } else {
-             request.decline(caller, comment, clock);
-         }
-@@ -147,7 +147,7 @@ public class PricingExceptionService {
-         requireVersion(oldEntity, expectedVersion);
-         PricingExceptionRequest old = mapper.toDomain(oldEntity);
-         old.markSuperseded(caller, clock);
--        requireOpen(loadApplication(oldEntity.getApplicationId()));
-+        requireApplicationOpen(oldEntity.getApplicationId());
-         mapper.applyTo(old, oldEntity);
-         requests.saveAndFlush(oldEntity); // active_application_id is now NULL; the unique index is free
+@@ -206,7 +206,7 @@ public class PricingExceptionService {
+         requireVersion(old, expectedVersion);
+         requirePending(old, "supersede");
+         requireOwner(old, caller, "supersede");
+-        requireOpen(lockApplication(old.getApplicationId()));
++        requireApplicationOpen(old.getApplicationId());
  
-@@ -204,6 +204,10 @@ public class PricingExceptionService {
-         return applications.findById(applicationId).orElseThrow(() -> ApiProblem.applicationNotFound(applicationId));
+         transition(old, RequestStatus.SUPERSEDED, EventType.SUPERSEDED, caller, clock.instant(), null);
+         requests.saveAndFlush(old); // active_application_id is now NULL; the unique index is free
+@@ -353,6 +353,13 @@ public class PricingExceptionService {
+         return requests.findById(id).orElseThrow(() -> ApiProblem.requestNotFound(id));
      }
  
-+    private void requireApplicationOpen(String applicationId) {
-+        requireOpen(loadApplication(applicationId));
++    /** Loads the application and checks INV-06 in one step. */
++    private MortgageApplicationEntity requireApplicationOpen(String applicationId) {
++        MortgageApplicationEntity application = lockApplication(applicationId);
++        requireOpen(application);
++        return application;
 +    }
 +
-     private static void requireOpen(MortgageApplicationEntity application) {
-         if (application.getStatus() != ApplicationStatus.OPEN) {
-             throw ApiProblem.applicationNotOpen(application.getId(), application.getStatus());
+     private MortgageApplicationEntity loadApplication(String applicationId) {
+         return applications.findById(applicationId).orElseThrow(() -> ApiProblem.applicationNotFound(applicationId));
+     }

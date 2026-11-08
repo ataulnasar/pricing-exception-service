@@ -19,12 +19,16 @@ Read both before you change any code.
 - Run the app (H2 + seed data): `./mvnw spring-boot:run`
 - A change is only done when `./mvnw verify` is green.
 
-## Package structure (`se.ataulnasar.pricingexception`)
-- `domain` — business rules in plain Java. **No Spring, no JPA, no Jackson imports.**
-- `application` — services that run one use case in one transaction.
-- `api` — controllers, DTOs (Java records), error handling (ProblemDetail).
-- `persistence` — JPA entities, repositories, mappers.
-- Controllers call services. Controllers never call repositories.
+## Package structure (`se.ataulnasar.pricingexception`, classic Spring MVC, ADR-007)
+- `controller` — `@RestController` classes and the `If-Match` parser.
+- `service` — `@Service` classes: **every business rule**, one use case per method in one transaction, idempotency.
+- `repository` — Spring Data JPA repositories.
+- `model` — JPA entities, their enums (`RequestStatus`, `EventType`, `Role`) and `Actor`.
+- `dto` — request and response records.
+- `exception` — `ApiProblem`, the business-rule exceptions, the ProblemDetail handler.
+- `config` — Clock and JSON beans, `pricing.*` properties, the `X-User-Id` argument resolver.
+- Controllers call services. Controllers never call repositories. Every status change goes
+  through `PricingExceptionService.transition` (one event per change).
 
 ## Business rules (short version — full list in `docs/invariants.yaml`)
 - INV-01: A submitted request never changes. To change the discount, the RM
@@ -54,13 +58,13 @@ If a task would break one of these rules, **stop and ask**. Do not work around i
 - No Lombok. Use Java records for DTOs and value objects.
 - Time comes from an injected `java.time.Clock`, never `Instant.now()` directly.
 - Money and rates are whole numbers in basis points (`int`), never `double`.
-- Errors: domain exceptions with a stable error `code`, mapped to ProblemDetail in `api`.
+- Errors: business-rule exceptions (`exception` package) with a stable error `code`, mapped to ProblemDetail by `ApiExceptionHandler`.
 - `decidedBy` and `decidedAt` come from the caller and the clock, **never from the request body**.
 - Show user text (like `reason`) as text, never as HTML.
 
 ## Tests
 - Test names say the rule they prove, e.g. `INV03_requester_cannot_approve_own_request`.
-- Domain tests are plain JUnit (no Spring context).
+- Rule tests are plain JUnit + Mockito on `PricingExceptionService` (no Spring context).
 - Use a fixed `Clock` in tests.
 
 ## Commits

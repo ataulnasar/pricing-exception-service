@@ -1,27 +1,32 @@
-diff --git a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
-index 0be7ec6..422dba3 100644
---- a/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
-+++ b/src/main/java/se/ataulnasar/pricingexception/application/PricingExceptionService.java
-@@ -59,9 +59,6 @@ public class PricingExceptionService {
-                 DiscountBps.of(discountBps, properties.maxDiscountBps()), new Reason(reason), null, clock);
+diff --git a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+index ceec19a..59d4d89 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
++++ b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+@@ -81,9 +81,6 @@ public class PricingExceptionService {
+         requireRole(caller, Role.RM, "submit");
  
-         requireOpen(loadApplication(applicationId));
+         requireOpen(lockApplication(applicationId));
 -        requests.findByActiveApplicationId(applicationId).ifPresent(active -> {
 -            throw ApiProblem.activeRequestExists(applicationId, active.getId());
 -        });
  
-         PricingExceptionRequestEntity saved = requests.saveAndFlush(mapper.toNewEntity(request));
-         return new RequestView(request, saved.getVersion());
-diff --git a/src/main/java/se/ataulnasar/pricingexception/persistence/PricingExceptionRequestMapper.java b/src/main/java/se/ataulnasar/pricingexception/persistence/PricingExceptionRequestMapper.java
-index b8aed49..ffddc92 100644
---- a/src/main/java/se/ataulnasar/pricingexception/persistence/PricingExceptionRequestMapper.java
-+++ b/src/main/java/se/ataulnasar/pricingexception/persistence/PricingExceptionRequestMapper.java
-@@ -83,7 +83,7 @@ public class PricingExceptionRequestMapper {
-         entity.setDecidedAt(request.decidedAt());
-         entity.setDecisionComment(request.decisionComment());
-         entity.setApprovedDiscountBps(request.approvedDiscount() == null ? null : request.approvedDiscount().value());
--        entity.setActiveApplicationId(request.activeApplicationId());
+         PricingExceptionRequestEntity saved = requests.saveAndFlush(newRequest(applicationId, caller, discountBps, reason, null));
+         return PricingExceptionResponse.from(saved, null);
+@@ -239,7 +236,7 @@ public class PricingExceptionService {
+         entity.setSupersedesId(supersedesId);
+         entity.setCreatedAt(now);
+         entity.setStatus(RequestStatus.PENDING);
+-        entity.setActiveApplicationId(applicationId);
 +        entity.setActiveApplicationId(null);
+         entity.getEvents().add(new RequestEventEntity(EventType.SUBMITTED, requester.id(), now, null, RequestStatus.PENDING, null));
+         return entity;
+     }
+@@ -258,7 +255,7 @@ public class PricingExceptionService {
+                                    Actor actor, Instant at, String comment) {
+         RequestStatus from = entity.getStatus();
+         entity.setStatus(to);
+-        entity.setActiveApplicationId(to.isActive() ? entity.getApplicationId() : null);
++        entity.setActiveApplicationId(null);
+         entity.getEvents().add(new RequestEventEntity(type, actor.id(), at, from, to, comment));
+     }
  
-         for (int i = stored.size(); i < events.size(); i++) {
-             RequestEvent e = events.get(i);

@@ -29,7 +29,7 @@ jobs:
       # GitHub runners have Docker, so a skip here means something is broken: fail loudly.
       - name: Fail if the PostgreSQL tests were skipped
         run: |
-          for cls in persistence.PostgresMigrationTest persistence.PostgresApiIT; do
+          for cls in repository.PostgresMigrationTest repository.PostgresApiIT; do
             report=target/surefire-reports/TEST-se.ataulnasar.pricingexception.$cls.xml
             test -f "$report" || { echo "PostgreSQL test report missing: $cls"; exit 1; }
             grep -q 'skipped="0"' "$report" || { echo "PostgreSQL tests were skipped in $cls:"; grep -o 'tests="[0-9]*"\|skipped="[0-9]*"' "$report"; exit 1; }

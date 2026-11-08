@@ -1,12 +1,12 @@
-diff --git a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-index 39a64a1..9088973 100644
---- a/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-+++ b/src/main/java/se/ataulnasar/pricingexception/domain/PricingExceptionRequest.java
-@@ -189,7 +189,6 @@ public final class PricingExceptionRequest {
-         Objects.requireNonNull(clock, "clock");
-         requirePending("decline");
-         requireRole(reviewer, Role.REVIEWER, "decline");
--        requireNotRequester(reviewer);
-         validateComment(comment);
-         decide(RequestStatus.DECLINED, RequestEvent.Type.DECLINED, reviewer, comment, clock);
-     }
+diff --git a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+index ceec19a..300258d 100644
+--- a/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
++++ b/src/main/java/se/ataulnasar/pricingexception/service/PricingExceptionService.java
+@@ -169,7 +169,6 @@ public class PricingExceptionService {
+         } else {
+             requirePending(entity, "decline");
+             requireRole(caller, Role.REVIEWER, "decline");
+-            requireNotRequester(entity, caller);
+             requireValidComment(comment);
+             recordDecision(entity, RequestStatus.DECLINED, EventType.DECLINED, caller, comment);
+         }

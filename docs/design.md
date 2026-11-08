@@ -34,8 +34,14 @@ Missing or unknown `X-User-Id` → 401.
 
 ## Mortgage applications (seed data)
 Fields: `id` (e.g. `MA-1001`), `customerRef`, `standardRateBps`, `status` (OPEN / CLOSED), `ownerRmId`.
-Seed 4 applications, one of them CLOSED. Also seed one APPROVED, one PENDING and one
-DECLINED request, each with its events.
+The seed (`src/main/resources/db/seed/V1000__local_seed_data.sql`, default profile only):
+
+| id | customer | standard rate (bps) | status | owner RM | requests in the seed |
+|---|---|---|---|---|---|
+| `MA-1001` | `CUST-0001` | 425 | OPEN | `rm-anna` | APPROVED, 30 bps (`00000000-0000-0000-0000-000000000001`) |
+| `MA-1002` | `CUST-0002` | 410 | OPEN | `rm-anna` | PENDING, 80 bps (`00000000-0000-0000-0000-000000000002`) |
+| `MA-1003` | `CUST-0003` | 450 | OPEN | `rm-erik` | DECLINED, 60 bps (`00000000-0000-0000-0000-000000000003`) |
+| `MA-1004` | `CUST-0004` | 395 | CLOSED | `rm-erik` | none |
 
 ## Request statuses
 - PENDING → APPROVED (reviewer), DECLINED (reviewer), WITHDRAWN (owner RM), SUPERSEDED (owner RM)
@@ -74,17 +80,21 @@ Errors use ProblemDetail (RFC 9457) with an extra `code` field.
 - `request_event` (id, request_id, type, actor_id, occurred_at, from_status, to_status, comment) — insert only
 - `idempotency_record` (caller_id, idem_key, request_hash, response_status, response_body, created_at), PK (caller_id, idem_key)
 
-## Packages (`se.ataulnasar.pricingexception`)
-`domain` (plain Java) · `application` (services) · `api` (controllers, DTOs) · `persistence` (JPA)
+## Packages (`se.ataulnasar.pricingexception`, classic Spring MVC, see ADR-007)
+`controller` (@RestController) · `service` (@Service: every business rule, transactions, idempotency) ·
+`repository` (Spring Data JPA) · `model` (@Entity classes, enums, `Actor`) · `dto` (request/response records) ·
+`exception` (`ApiProblem`, business-rule exceptions, ProblemDetail handler) · `config` (Clock, JSON, properties, `X-User-Id` resolver)
 
-## Domain error codes and events
-- **Error codes** (stable `code` on domain exceptions, mapped to ProblemDetail in `api`):
+## Business-rule error codes and events
+- **Error codes** (stable `code` on the exceptions in `exception`, mapped to ProblemDetail by `ApiExceptionHandler`):
   - `ForbiddenActionException`: `WRONG_ROLE`, `SELF_REVIEW`, `OVER_APPROVAL_LIMIT`, `NOT_OWNER`
   - `InvalidTransitionException`: `INVALID_TRANSITION`
   - `ValidationException`: `INVALID_DISCOUNT`, `INVALID_REASON`, `INVALID_COMMENT`
 - **Event types** (`request_event.type`, one per status change): `SUBMITTED`, `APPROVED`, `DECLINED`, `WITHDRAWN`, `SUPERSEDED`
-- **Check order for decisions** (approve / decline): status, then role, then self-review, then approval limit.
-- **INV-06** (application must be OPEN) is checked in the application service, not in the domain.
+- **Check order for decisions** (approve / decline): status, then role, then self-review, then approval limit, then comment length. All checks run in `PricingExceptionService` before any field of the entity changes.
+- **INV-06** (application must be OPEN) is checked in `PricingExceptionService` after the checks above,
+  on the application row read with `SELECT ... FOR UPDATE` (`findForUpdateById`, ADR-008), so a
+  concurrent close either committed before the check or waits for our commit.
 
 ## API error codes
 Every error is an RFC 9457 ProblemDetail (`application/problem+json`) with `status`, `title`,

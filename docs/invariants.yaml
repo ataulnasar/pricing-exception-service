@@ -13,7 +13,7 @@ invariants:
       An approval must always apply to the exact request that was reviewed.
       The audit trail must show what was really approved.
     tests:
-      - PricingExceptionRequestTest.INV01_approval_records_reviewed_discount
+      - PricingExceptionServiceTest.INV01_approval_records_reviewed_discount
       - SupersedeIT.INV01_only_pending_request_can_be_superseded
       - SupersedeIT.INV01_no_endpoint_changes_discount_after_approval
 
@@ -35,9 +35,9 @@ invariants:
     why: >
       Four-eyes principle and approval authority are basic controls in banking.
     tests:
-      - PricingExceptionRequestTest.INV03_requester_cannot_approve_own_request
-      - PricingExceptionRequestTest.INV03_requester_cannot_decline_own_request
-      - PricingExceptionRequestTest.INV03_reviewer_cannot_approve_above_limit
+      - PricingExceptionServiceTest.INV03_requester_cannot_approve_own_request
+      - PricingExceptionServiceTest.INV03_requester_cannot_decline_own_request
+      - PricingExceptionServiceTest.INV03_reviewer_cannot_approve_above_limit
 
   - id: INV-04
     rule: >
@@ -58,7 +58,7 @@ invariants:
     why: >
       A request is decided once. Two reviewers can never both decide it.
     tests:
-      - StatusCommandMatrixTest.INV05_transition_table
+      - PricingExceptionServiceTest.INV05_transition_table
       - ConcurrencyIT.INV05_two_parallel_decisions_only_one_wins
       - WorkflowIT.INV05_decision_without_if_match_is_428_end_to_end
 
@@ -71,3 +71,6 @@ invariants:
     tests:
       - WorkflowIT.INV06_cannot_create_for_closed_application
       - WorkflowIT.INV06_cannot_approve_for_closed_application
+      - PricingExceptionServiceTest.INV06_approve_rejected_when_the_locked_row_is_CLOSED
+      - ConcurrencyIT.INV06_approval_waits_for_a_concurrent_close_and_is_rejected
+      - PostgresApiIT.INV06_approval_waits_for_a_concurrent_close_and_is_rejected_on_postgres

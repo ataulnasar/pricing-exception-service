@@ -3,10 +3,10 @@
     "case": "inv01-approval-stores-rounded-discount",
     "patch": "inv01-approval-stores-rounded-discount.patch",
     "expected": "INV-01",
-    "description": "approve() stores approvedDiscount rounded down to a 5 bps grid instead of the reviewed discount",
+    "description": "decide() stores approvedDiscountBps rounded down to a 5 bps grid instead of the reviewed discount",
     "tests": [
-      "PricingExceptionRequestTest",
-      "ReconstituteTest"
+      "PricingExceptionServiceTest",
+      "WorkflowIT"
     ]
   },
   {
@@ -15,8 +15,7 @@
     "expected": "INV-02",
     "description": "withdraw() sets the status directly and writes no WITHDRAWN history event",
     "tests": [
-      "PricingExceptionRequestTest",
-      "StatusCommandMatrixTest",
+      "PricingExceptionServiceTest",
       "WithdrawalIT"
     ]
   },
@@ -24,18 +23,18 @@
     "case": "inv03-decline-skips-self-review-check",
     "patch": "inv03-decline-skips-self-review-check.patch",
     "expected": "INV-03",
-    "description": "decline() no longer calls requireNotRequester, so a requester-reviewer can decline their own request",
+    "description": "decide(DECLINED) no longer calls requireNotRequester, so a requester-reviewer can decline their own request",
     "tests": [
-      "PricingExceptionRequestTest"
+      "PricingExceptionServiceTest"
     ]
   },
   {
     "case": "inv04-no-precheck-and-no-active-slot",
     "patch": "inv04-no-precheck-and-no-active-slot.patch",
     "expected": "INV-04",
-    "description": "create() drops the active-request pre-check and the mapper always stores a NULL active_application_id, so the unique index protects nothing",
+    "description": "create() drops the active-request pre-check and active_application_id is always NULL, so the unique index protects nothing",
     "tests": [
-      "PricingExceptionRequestRepositoryTest",
+      "PricingExceptionServiceTest",
       "ConcurrencyIT"
     ]
   },
@@ -43,17 +42,16 @@
     "case": "inv05-decline-allowed-after-decision",
     "patch": "inv05-decline-allowed-after-decision.patch",
     "expected": "INV-05",
-    "description": "decline() only rejects WITHDRAWN and SUPERSEDED, so APPROVED and DECLINED requests can be declined again",
+    "description": "decide(DECLINED) only rejects WITHDRAWN and SUPERSEDED, so APPROVED and DECLINED requests can be declined again",
     "tests": [
-      "StatusCommandMatrixTest",
-      "PricingExceptionRequestTest"
+      "PricingExceptionServiceTest"
     ]
   },
   {
     "case": "inv06-approve-skips-open-check",
     "patch": "inv06-approve-skips-open-check.patch",
     "expected": "INV-06",
-    "description": "decide() no longer calls requireOpen for APPROVED, so a request on a closed application can be approved",
+    "description": "decide(APPROVED) no longer checks that the application is OPEN, so a request on a closed application can be approved",
     "tests": [
       "WorkflowIT"
     ]
@@ -62,14 +60,14 @@
     "case": "clean01-extract-require-application-open",
     "patch": "clean01-extract-require-application-open.patch",
     "expected": "none",
-    "description": "Extracts requireApplicationOpen(applicationId) helper in the service; behaviour unchanged",
+    "description": "Extracts a requireApplicationOpen(applicationId) helper in the service; behaviour unchanged",
     "tests": []
   },
   {
-    "case": "clean02-mapper-extract-approved-discount",
-    "patch": "clean02-mapper-extract-approved-discount.patch",
+    "case": "clean02-extract-record-decision-time",
+    "patch": "clean02-extract-record-decision-time.patch",
     "expected": "none",
-    "description": "Mapper: extracts approvedDiscountOf(entity) and a storedCount local; behaviour unchanged",
+    "description": "Service: extracts a now() helper for clock.instant() in recordDecision, withdraw and supersede; behaviour unchanged",
     "tests": []
   }
 ]
