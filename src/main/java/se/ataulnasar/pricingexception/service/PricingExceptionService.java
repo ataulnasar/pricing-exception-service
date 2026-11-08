@@ -80,7 +80,7 @@ public class PricingExceptionService {
         }
         requireRole(caller, Role.RM, "submit");
 
-        requireOpen(loadApplication(applicationId));
+        requireOpen(lockApplication(applicationId));
         requests.findByActiveApplicationId(applicationId).ifPresent(active -> {
             throw ApiProblem.activeRequestExists(applicationId, active.getId());
         });
@@ -163,7 +163,7 @@ public class PricingExceptionService {
                                 + "'s approval limit of " + caller.approvalLimitBps() + " bps");
             }
             requireValidComment(comment);
-            requireOpen(loadApplication(entity.getApplicationId())); // INV-06, after the business checks
+            requireOpen(lockApplication(entity.getApplicationId())); // INV-06, after the business checks
             entity.setApprovedDiscountBps(entity.getDiscountBps());  // INV-01: the discount the reviewer saw
             recordDecision(entity, RequestStatus.APPROVED, EventType.APPROVED, caller, comment);
         } else {
@@ -206,7 +206,7 @@ public class PricingExceptionService {
         requireVersion(old, expectedVersion);
         requirePending(old, "supersede");
         requireOwner(old, caller, "supersede");
-        requireOpen(loadApplication(old.getApplicationId()));
+        requireOpen(lockApplication(old.getApplicationId()));
 
         transition(old, RequestStatus.SUPERSEDED, EventType.SUPERSEDED, caller, clock.instant(), null);
         requests.saveAndFlush(old); // active_application_id is now NULL; the unique index is free
@@ -355,5 +355,10 @@ public class PricingExceptionService {
 
     private MortgageApplicationEntity loadApplication(String applicationId) {
         return applications.findById(applicationId).orElseThrow(() -> ApiProblem.applicationNotFound(applicationId));
+    }
+
+    /** The application row locked until this transaction ends, so a concurrent close cannot slip between the INV-06 check and the commit (ADR-008). */
+    private MortgageApplicationEntity lockApplication(String applicationId) {
+        return applications.findForUpdateById(applicationId).orElseThrow(() -> ApiProblem.applicationNotFound(applicationId));
     }
 }

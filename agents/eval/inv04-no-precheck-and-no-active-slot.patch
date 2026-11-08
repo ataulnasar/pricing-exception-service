@@ -5,7 +5,7 @@ index ceec19a..59d4d89 100644
 @@ -81,9 +81,6 @@ public class PricingExceptionService {
          requireRole(caller, Role.RM, "submit");
  
-         requireOpen(loadApplication(applicationId));
+         requireOpen(lockApplication(applicationId));
 -        requests.findByActiveApplicationId(applicationId).ifPresent(active -> {
 -            throw ApiProblem.activeRequestExists(applicationId, active.getId());
 -        });

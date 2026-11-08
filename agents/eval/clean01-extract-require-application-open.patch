@@ -6,7 +6,7 @@ index ceec19a..bac548c 100644
          }
          requireRole(caller, Role.RM, "submit");
  
--        requireOpen(loadApplication(applicationId));
+-        requireOpen(lockApplication(applicationId));
 +        requireApplicationOpen(applicationId);
          requests.findByActiveApplicationId(applicationId).ifPresent(active -> {
              throw ApiProblem.activeRequestExists(applicationId, active.getId());
@@ -15,7 +15,7 @@ index ceec19a..bac548c 100644
                                  + "'s approval limit of " + caller.approvalLimitBps() + " bps");
              }
              requireValidComment(comment);
--            requireOpen(loadApplication(entity.getApplicationId())); // INV-06, after the business checks
+-            requireOpen(lockApplication(entity.getApplicationId())); // INV-06, after the business checks
 +            requireApplicationOpen(entity.getApplicationId()); // INV-06, after the business checks
              entity.setApprovedDiscountBps(entity.getDiscountBps());  // INV-01: the discount the reviewer saw
              recordDecision(entity, RequestStatus.APPROVED, EventType.APPROVED, caller, comment);
@@ -24,7 +24,7 @@ index ceec19a..bac548c 100644
          requireVersion(old, expectedVersion);
          requirePending(old, "supersede");
          requireOwner(old, caller, "supersede");
--        requireOpen(loadApplication(old.getApplicationId()));
+-        requireOpen(lockApplication(old.getApplicationId()));
 +        requireApplicationOpen(old.getApplicationId());
  
          transition(old, RequestStatus.SUPERSEDED, EventType.SUPERSEDED, caller, clock.instant(), null);
@@ -35,7 +35,7 @@ index ceec19a..bac548c 100644
  
 +    /** Loads the application and checks INV-06 in one step. */
 +    private MortgageApplicationEntity requireApplicationOpen(String applicationId) {
-+        MortgageApplicationEntity application = loadApplication(applicationId);
++        MortgageApplicationEntity application = lockApplication(applicationId);
 +        requireOpen(application);
 +        return application;
 +    }

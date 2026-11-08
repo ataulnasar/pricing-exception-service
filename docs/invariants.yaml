@@ -71,3 +71,6 @@ invariants:
     tests:
       - WorkflowIT.INV06_cannot_create_for_closed_application
       - WorkflowIT.INV06_cannot_approve_for_closed_application
+      - PricingExceptionServiceTest.INV06_approve_rejected_when_the_locked_row_is_CLOSED
+      - ConcurrencyIT.INV06_approval_waits_for_a_concurrent_close_and_is_rejected
+      - PostgresApiIT.INV06_approval_waits_for_a_concurrent_close_and_is_rejected_on_postgres

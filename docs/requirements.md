@@ -28,7 +28,7 @@ The `Proved by` column lists the tests or documents that show each requirement i
 | D2 | Seed data or setup steps to try a realistic workflow | seed migration, README demo, UI | ✅ seed: `src/main/resources/db/seed/V1000__local_seed_data.sql`; walkthrough: README "Three-minute demo", the UI and Swagger UI; the full scenario runs in `WorkflowIT` |
 | D3 | Source in Git, with instructions to run, test and explore | GitHub repo, README | ✅ github.com/ataulnasar/pricing-exception-service; `README.md` quick start; `docs/runbook.md` |
 | D4 | Short README: the problem, assumptions, scope choices | `README.md` | ✅ `README.md` |
-| D5 | Evidence that important behaviour is tested | test suite, the `Proved by` column above | ✅ 477 tests in `./mvnw verify` incl. Postgres (CI); 58 Python tests (review agent and project guide); this file; README "Requirement → test" |
+| D5 | Evidence that important behaviour is tested | test suite, the `Proved by` column above | ✅ 486 tests in `./mvnw verify` incl. Postgres (CI); 58 Python tests (review agent and project guide); this file; README "Requirement → test" |
 | D6 | Decisions, diagrams, notes and operational guidance for the next engineer | `docs/adr/`, `docs/diagrams/`, `docs/runbook.md` | ✅ `docs/adr/ADR-001..006`, `docs/diagrams/` (state machine, architecture, development flow), `docs/runbook.md`, `docs/design.md`, `docs/invariants.yaml` |
 
 ## Constraints
@@ -37,7 +37,7 @@ The `Proved by` column lists the tests or documents that show each requirement i
 |---|---|---|---|
 | C1 | Any language and tools; Java or C# preferred | Java 21, Spring Boot 4 | ✅ |
 | C2 | Easy to run locally; no private infrastructure or paid services | H2 by default; Postgres optional via Docker | ✅ H2 in memory by default; Postgres only via Testcontainers / `postgres` profile (`docs/runbook.md`) |
-| C3 | Say what must change before production where we took a lighter path | README "Before production" section | ✅ README "Before production" (7 items) |
+| C3 | Say what must change before production where we took a lighter path | README "Before production" section | ✅ README "Before production" (6 items) |
 | C4 | Use agentic development where it adds value; be ready to explain how agents helped and how output was checked | `.claude/agents/`, `docs/agent-workflow.md`, `docs/ai-usage.md` | ✅ `.claude/agents/`, `.claude/commands/run-phase.md`, `docs/agent-workflow.md`, `docs/ai-usage.md` (one line per phase), `.claude/agents/project-guide.md` (/ask), `agents/ask.py` |
 
 ## Bonus

@@ -100,7 +100,10 @@ final class ServiceFixtures {
         }
 
         void setApplicationStatus(ApplicationStatus status) {
+            // the service may read with or without the row lock (INV-06); both give the same answer here
             when(applications.findById(any())).thenAnswer(inv -> Optional.of(
+                    new MortgageApplicationEntity(inv.getArgument(0), "CUST-1", 450, status, "rm-anna")));
+            when(applications.findForUpdateById(any())).thenAnswer(inv -> Optional.of(
                     new MortgageApplicationEntity(inv.getArgument(0), "CUST-1", 450, status, "rm-anna")));
         }
 

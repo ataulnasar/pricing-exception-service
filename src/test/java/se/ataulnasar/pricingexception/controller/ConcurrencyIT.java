@@ -3,14 +3,21 @@ package se.ataulnasar.pricingexception.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static se.ataulnasar.pricingexception.controller.Api.*;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,6 +51,7 @@ class ConcurrencyIT {
 
     @LocalServerPort int port;
     @Autowired JdbcTemplate jdbc;
+    @Autowired DataSource dataSource;
     @Autowired ScheduledAnnotationBeanPostProcessor scheduler;
     @Autowired IdempotencyRecordRepository records;
     @Autowired PricingProperties props;
@@ -538,5 +546,70 @@ class ConcurrencyIT {
         assertThat(purge).as("purge task registered (@EnableScheduling on)").isPresent();
         assertThat(purge.get()).isInstanceOf(FixedDelayTask.class);
         assertThat(((FixedDelayTask) purge.get()).getIntervalDuration()).isEqualTo(props.idempotency().purgeInterval());
+    }
+
+    /**
+     * INV-06: an external writer closes the application and holds the row lock (uncommitted). The approval
+     * must wait for that lock and then see CLOSED. Without the FOR UPDATE read this gets 200: the stale
+     * OPEN read wins and the approval is stored on a closed application.
+     */
+    @Test
+    void INV06_approval_waits_for_a_concurrent_close_and_is_rejected() throws Exception {
+        String app = newApp();
+        String location = create("rm-anna", createBody(app, 40), null).status(201).location();
+        String etag = api.get("rm-anna", location).etag();
+
+        Connection closer = dataSource.getConnection();
+        CompletableFuture<Resp> approval;
+        try {
+            closer.setAutoCommit(false);
+            try (PreparedStatement ps = closer.prepareStatement("UPDATE mortgage_application SET status = 'CLOSED' WHERE id = ?")) {
+                ps.setString(1, app);
+                assertThat(ps.executeUpdate()).isEqualTo(1);
+            }
+            approval = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return api.decide(location, "rev-sara", "APPROVED", etag);
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            });
+            // wait until the database reports the approval blocked on our row lock (no fixed sleep: a slow box
+            // must not let the close commit before the approval has reached its SELECT)
+            boolean blocked = false;
+            for (int i = 0; i < 250 && !blocked; i++) {
+                try (PreparedStatement ps = closer.prepareStatement("SELECT COUNT(*) FROM INFORMATION_SCHEMA.SESSIONS WHERE BLOCKER_ID IS NOT NULL");
+                     ResultSet rs = ps.executeQuery()) {
+                    rs.next();
+                    blocked = rs.getInt(1) > 0;
+                }
+                if (!blocked) Thread.sleep(20);
+            }
+            assertThat(blocked).as("the approval was observed blocked on the row lock").isTrue();
+            assertThat(approval).as("the approval is blocked on the row lock").isNotDone();
+            closer.commit();
+        } finally {
+            closer.close();
+        }
+
+        approval.get(20, TimeUnit.SECONDS).problem(409, "APPLICATION_NOT_OPEN");
+        Resp after = api.get("rm-anna", location);
+        after.has("$.status", "PENDING");
+        assertThat(after.events()).isEqualTo(1); // INV-02: no event for the rejected approval
+        assertThat(jdbc.queryForObject("SELECT approved_discount_bps FROM pricing_exception_request WHERE id = ?",
+                Integer.class, UUID.fromString(after.id()))).isNull();
+    }
+
+    @Test
+    void INV06_lock_is_released_after_the_transaction() throws Exception {
+        String app = newApp();
+        String location = create("rm-anna", createBody(app, 40), null).status(201).location();
+        api.decide(location, "rev-sara", "APPROVED", api.get("rm-anna", location).etag()).status(200);
+
+        CompletableFuture<Integer> close = CompletableFuture.supplyAsync(
+                () -> jdbc.update("UPDATE mortgage_application SET status = 'CLOSED' WHERE id = ?", app));
+
+        assertThat(close.get(2, TimeUnit.SECONDS)).isEqualTo(1);
+        api.get("rm-anna", location).has("$.status", "APPROVED");
     }
 }

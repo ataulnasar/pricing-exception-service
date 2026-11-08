@@ -92,7 +92,9 @@ Errors use ProblemDetail (RFC 9457) with an extra `code` field.
   - `ValidationException`: `INVALID_DISCOUNT`, `INVALID_REASON`, `INVALID_COMMENT`
 - **Event types** (`request_event.type`, one per status change): `SUBMITTED`, `APPROVED`, `DECLINED`, `WITHDRAWN`, `SUPERSEDED`
 - **Check order for decisions** (approve / decline): status, then role, then self-review, then approval limit, then comment length. All checks run in `PricingExceptionService` before any field of the entity changes.
-- **INV-06** (application must be OPEN) is checked in `PricingExceptionService` after the checks above.
+- **INV-06** (application must be OPEN) is checked in `PricingExceptionService` after the checks above,
+  on the application row read with `SELECT ... FOR UPDATE` (`findForUpdateById`, ADR-008), so a
+  concurrent close either committed before the check or waits for our commit.
 
 ## API error codes
 Every error is an RFC 9457 ProblemDetail (`application/problem+json`) with `status`, `title`,

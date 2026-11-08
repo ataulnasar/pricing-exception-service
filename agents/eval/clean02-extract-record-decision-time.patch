@@ -13,7 +13,7 @@ index ceec19a..de74347 100644
  
 @@ -208,7 +208,7 @@ public class PricingExceptionService {
          requireOwner(old, caller, "supersede");
-         requireOpen(loadApplication(old.getApplicationId()));
+         requireOpen(lockApplication(old.getApplicationId()));
  
 -        transition(old, RequestStatus.SUPERSEDED, EventType.SUPERSEDED, caller, clock.instant(), null);
 +        transition(old, RequestStatus.SUPERSEDED, EventType.SUPERSEDED, caller, now(), null);

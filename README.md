@@ -72,7 +72,9 @@ that was asked for. Reasoning: [ADR-001](docs/adr/ADR-001.md). States:
 
 The other rules the service enforces, INV-01 to INV-06, are in
 [docs/invariants.yaml](docs/invariants.yaml). Every business rule lives in one class,
-`PricingExceptionService`, and every status change writes exactly one history event.
+`PricingExceptionService`, and every status change writes exactly one history event. The
+application row is locked while INV-06 is checked, so a concurrent close cannot slip in
+([ADR-008](docs/adr/ADR-008.md)).
 
 ## API
 
@@ -106,14 +108,12 @@ through the API; audit beyond the `request_event` history.
 
 1. **Real login and authorisation.** Replace trust in the `X-User-Id` header; today any seeded
    identity can be assumed.
-2. **Lock the application when approving.** The application is read without a lock, so one closed
-   between the check and the commit could still receive an approval (INV-06 race).
-3. **Enum CHECK constraints.** Add them back in a new migration once Spring Boot ships an H2 with
+2. **Enum CHECK constraints.** Add them back in a new migration once Spring Boot ships an H2 with
    the fix for h2database issue #4342 (see [docs/runbook.md](docs/runbook.md), "Known issues").
-4. **Revoke or expire an approval.** An APPROVED request keeps the application's slot forever.
-5. **Observability.** Structured logs, metrics and tracing; today there is only `/actuator/health`.
-6. **Secrets per environment.** The `postgres` profile has placeholder credentials.
-7. Smaller open reviewer notes (driver-dependent error mapping, nullable approved discount, list
+3. **Revoke or expire an approval.** An APPROVED request keeps the application's slot forever.
+4. **Observability.** Structured logs, metrics and tracing; today there is only `/actuator/health`.
+5. **Secrets per environment.** The `postgres` profile has placeholder credentials.
+6. Smaller open reviewer notes (driver-dependent error mapping, nullable approved discount, list
    without paging, and others) are in [docs/runbook.md](docs/runbook.md#open-notes-before-production).
 
 ## Time spent
@@ -145,7 +145,7 @@ request and was evaluated against seeded bugs, is described in
 
 - [docs/design.md](docs/design.md): the design, decisions, seed data, tables and the full API.
 - [docs/invariants.yaml](docs/invariants.yaml): the business rules (INV-01 to INV-06).
-- [docs/adr/](docs/adr/): architecture decision records ADR-001 to ADR-007.
+- [docs/adr/](docs/adr/): architecture decision records ADR-001 to ADR-008.
 - [docs/diagrams/](docs/diagrams/): state machine, architecture, development flow.
 - [docs/runbook.md](docs/runbook.md): configuration, health, error codes, database reset, logs, PostgreSQL tests.
 - [docs/requirements.md](docs/requirements.md): the requirements and where each one is proved.

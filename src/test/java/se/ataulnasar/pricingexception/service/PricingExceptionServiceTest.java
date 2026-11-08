@@ -2,7 +2,9 @@ package se.ataulnasar.pricingexception.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static se.ataulnasar.pricingexception.service.ServiceFixtures.*;
@@ -37,6 +39,7 @@ import se.ataulnasar.pricingexception.exception.ValidationException;
 import se.ataulnasar.pricingexception.model.Actor;
 import se.ataulnasar.pricingexception.model.ApplicationStatus;
 import se.ataulnasar.pricingexception.model.EventType;
+import se.ataulnasar.pricingexception.model.MortgageApplicationEntity;
 import se.ataulnasar.pricingexception.model.PricingExceptionRequestEntity;
 import se.ataulnasar.pricingexception.model.RequestEventEntity;
 import se.ataulnasar.pricingexception.model.RequestStatus;
@@ -578,6 +581,70 @@ class PricingExceptionServiceTest {
         withdraw(w, ANNA);
         assertThat(d.getStatus()).isEqualTo(RequestStatus.DECLINED);
         assertThat(w.getStatus()).isEqualTo(RequestStatus.WITHDRAWN);
+    }
+
+    // ---------- INV-06: the application row is read with a lock (no window for a concurrent close) ----------
+
+    @Test
+    void INV06_create_locks_the_application_row() {
+        h.service.create(ANNA, APPLICATION_ID, 40, "why");
+
+        verify(h.applications).findForUpdateById(APPLICATION_ID);
+    }
+
+    @Test
+    void INV06_approve_locks_the_application_row() {
+        PricingExceptionRequestEntity r = stubbed(pending());
+
+        approve(r, JOHAN, null);
+
+        verify(h.applications).findForUpdateById(APPLICATION_ID);
+    }
+
+    @Test
+    void INV06_supersede_locks_the_application_row() {
+        PricingExceptionRequestEntity r = stubbed(pending());
+
+        supersede(r, ANNA);
+
+        verify(h.applications).findForUpdateById(APPLICATION_ID);
+    }
+
+    @Test
+    void INV06_decline_does_not_read_the_application() {
+        PricingExceptionRequestEntity r = stubbed(pending());
+
+        decline(r, JOHAN, null);
+
+        verify(h.applications, never()).findForUpdateById(any());
+        verify(h.applications, never()).findById(any());
+    }
+
+    @Test
+    void INV06_approved_discount_lookup_does_not_lock() {
+        PricingExceptionRequestEntity r = inStatus(RequestStatus.APPROVED);
+        when(h.requests.findByApplicationIdAndStatus(APPLICATION_ID, RequestStatus.APPROVED)).thenReturn(List.of(r));
+
+        h.service.approvedDiscount(MORTGAGE, APPLICATION_ID);
+
+        verify(h.applications).findById(APPLICATION_ID);
+        verify(h.applications, never()).findForUpdateById(any());
+    }
+
+    @Test
+    void INV06_approve_rejected_when_the_locked_row_is_CLOSED() {
+        // the plain read says OPEN (stale), the locked read says CLOSED: the locked read must decide
+        PricingExceptionRequestEntity r = stubbed(pending());
+        when(h.applications.findForUpdateById(any())).thenAnswer(inv -> Optional.of(
+                new MortgageApplicationEntity(inv.getArgument(0), "CUST-1", 450, ApplicationStatus.CLOSED, "rm-anna")));
+
+        Snapshot before = Snapshot.of(r);
+
+        // (assertRejectedAndUntouched expects BusinessRuleException; APPLICATION_NOT_OPEN is an ApiProblem, so inline)
+        assertThatThrownBy(() -> approve(r, JOHAN, null))
+                .isInstanceOfSatisfying(ApiProblem.class, e -> assertThat(e.code()).isEqualTo(ApiProblem.APPLICATION_NOT_OPEN));
+        assertThat(Snapshot.of(r)).isEqualTo(before);
+        h.assertNothingSaved();
     }
 
     @Test

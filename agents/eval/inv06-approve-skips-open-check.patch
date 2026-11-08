@@ -6,7 +6,7 @@ index ceec19a..d24af72 100644
                                  + "'s approval limit of " + caller.approvalLimitBps() + " bps");
              }
              requireValidComment(comment);
--            requireOpen(loadApplication(entity.getApplicationId())); // INV-06, after the business checks
+-            requireOpen(lockApplication(entity.getApplicationId())); // INV-06, after the business checks
              entity.setApprovedDiscountBps(entity.getDiscountBps());  // INV-01: the discount the reviewer saw
              recordDecision(entity, RequestStatus.APPROVED, EventType.APPROVED, caller, comment);
          } else {
