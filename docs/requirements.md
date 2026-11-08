@@ -51,6 +51,6 @@ The `Proved by` column lists the tests or documents that show each requirement i
 
 | ID | Item | Done |
 |---|---|---|
-| S1 | Share the repository | TODO |
+| S1 | Share the repository | ✅ public repo: github.com/ataulnasar/pricing-exception-service; `main` protected by a ruleset (pull request required, no force push, no deletion) |
 | S2 | Include the time spent | ✅ README "Time spent" (about 6 hours) |
-| S3 | Be ready to walk through choices, run a scenario, and say what you would do next | TODO |
+| S3 | Be ready to walk through choices, run a scenario, and say what you would do next | ✅ README "The main design decision" (choices), "Three-minute demo" (scenario), "Before production" (what comes next) |

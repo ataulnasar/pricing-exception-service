@@ -35,3 +35,6 @@ build/
 # Python (agents/review.py and its tests)
 __pycache__/
 *.pyc
+
+# Claude desktop app local run config
+.claude/launch.json
