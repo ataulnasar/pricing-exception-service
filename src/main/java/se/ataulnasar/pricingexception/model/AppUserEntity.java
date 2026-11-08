@@ -8,7 +8,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-import se.ataulnasar.pricingexception.model.Role;
 
 /** Row in {@code app_user}: a seeded user, identified by the {@code X-User-Id} header value. */
 @Entity

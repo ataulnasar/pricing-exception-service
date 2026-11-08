@@ -17,11 +17,6 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import se.ataulnasar.pricingexception.exception.ApiProblem;
-import se.ataulnasar.pricingexception.exception.BusinessRuleException;
-import se.ataulnasar.pricingexception.exception.ForbiddenActionException;
-import se.ataulnasar.pricingexception.exception.InvalidTransitionException;
-import se.ataulnasar.pricingexception.exception.ValidationException;
 
 /**
  * Maps every error to an RFC 9457 ProblemDetail with a stable {@code code} property
