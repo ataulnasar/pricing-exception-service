@@ -17,7 +17,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import se.ataulnasar.pricingexception.model.RequestStatus;
 
 /**
  * Row in {@code pricing_exception_request} plus its {@code request_event} rows.

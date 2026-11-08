@@ -11,8 +11,6 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.Instant;
-import se.ataulnasar.pricingexception.model.EventType;
-import se.ataulnasar.pricingexception.model.RequestStatus;
 
 /** Row in {@code request_event}. Insert only; owned by {@link PricingExceptionRequestEntity#getEvents()}. */
 @Entity
